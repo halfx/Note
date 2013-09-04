@@ -1,0 +1,2 @@
+1. VIM中全局替换使用%s命令：
+   eg: %s\abc\def\g  ：全局将abc替换为def
