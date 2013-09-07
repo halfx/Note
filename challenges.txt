@@ -1,0 +1,18 @@
+CHALLENGES :http://www.enigmagroup.org/
+1. Basic Skills
+    Miscellaneous:
+       Misc. 1 - Header Injections : 
+          You can find the password in response, the last char is "=" and it means the
+          password was encoded in base64, just decoded it.
+       Misc. 2 - Server Side Includes :
+          http://en.wikipedia.org/wiki/Server_Side_Includes : input <!--#exec cmd="ls -l" --> ,
+	  the server will execute cmd and list all the files in current directory, you will find
+	  a file names "password", use password in this file login the AdminPage , the name is "admin"
+      Misc. 3 - Regexp Skills:
+	var reg = new RegExp("^[A-Za-z0-9]{5}");  # 检查开头的5个字符是否是字母或者数字  
+	reg = new RegExp("^[^e-z0-9A-Z]+[^A-Z]{4}{?[a-z]*_?");
+	reg = new RegExp("^[A9FbdHh5]+[T]*.{2}_?[a-z]+");
+	reg = new RegExp("^[^YdSeu][r]+[^r]+=?_?[aeiou]+[^pstuvwxyz]+");
+	reg = new RegExp("^(c|a|b|d)+[^A-Za-df-qs-z]{2}{?[^vCXBhq]*[^pqrst]*[a]+[^passwd]*}?");
+	reg = new RegExp("^.*[k0pst]$");
+	reg = new RegExp("^[^0-9A-Z]{5}$");
