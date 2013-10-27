@@ -44,6 +44,3 @@ CHALLENGES :http://www.enigmagroup.org/
         sql3: 绕过filter：
             /*!union*/ select 10,username,password from users-- ：输出administrator  6cfdca6f9633968c72a2a6e0fe2756ca（这个加了两次密）
             解密后密码：asdfgh
-         
-            
-       
