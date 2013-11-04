@@ -43,3 +43,7 @@
    上面的语句将ab替换为abd，c直接输出
 
 9. tr "|" "'" tr命令将字符|替换为'
+
+10. find . -name "*Makefile*"| xargs grep -ri "term.txt.py" -l
+    搜索当前目录下包含字符串"term.txt.py"的所有名字模式为"*.Makefile"的文件(包括子目录中的文件)，
+    只输出文件名
