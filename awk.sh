@@ -1,4 +1,3 @@
-
 1. awk 'BEGIN{while(getline<"'$file1'")dict[$1]=1} (dict[$2]!=1){print $1"\t"$2"\t3"}' $file2 >> tmp_type
    awk首先读取file1并创建词典dict[],然后读取file2，测试fil2中的$2在dict是否存在，若不
 存在，则将$2,$3输出到tmp_type(这样去除了file1和file2中的重复行)，若读取一行，则getline返回1，若到达文件
@@ -47,3 +46,5 @@
 10. find . -name "*Makefile*"| xargs grep -ri "term.txt.py" -l
     搜索当前目录下包含字符串"term.txt.py"的所有名字模式为"*.Makefile"的文件(包括子目录中的文件)，
     只输出文件名
+    
+11. grep 中同时使用多个条件: cat file | grep -v "ERROR" | grep -v "WARN" 将过滤掉file中包含ERROR和WARN的行
