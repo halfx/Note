@@ -44,6 +44,7 @@ CHALLENGES :http://www.enigmagroup.org/
         sql3: 绕过filter：
             /*!union*/ select 10,username,password from users-- ：输出administrator  6cfdca6f9633968c72a2a6e0fe2756ca（这个加了两次密）
             解密后密码：asdfgh
+<<<<<<< HEAD
 
         sql4: User agent SQL injection
             修改 User Agent字段：
@@ -58,3 +59,5 @@ CHALLENGES :http://www.enigmagroup.org/
          
             
        
+=======
+>>>>>>> 3ab0d806098ae715b07b95ab0543dc6eb467f74a

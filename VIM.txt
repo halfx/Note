@@ -1,2 +1,11 @@
 1. VIM中全局替换使用%s命令：
    eg: %s\abc\def\g  ：全局将abc替换为def
+   
+2. VIM中输入tab(特别是在写makefile时)
+   在insert mode下首先按Ctrl+V，然后输入tab
+
+3. 撤销：Ctrl + r
+
+4. NERDTree: Ctrl+w 切换窗口
+             i: split window打开文件/书签
+             t: 在新的tab中打开文件/书签
