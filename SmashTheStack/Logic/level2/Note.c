@@ -19,3 +19,10 @@ int main()
 }
 
 /* 调试时发现程序获取的PAYLOAD的地址和打印出来的有可能不一样*/
+不同的执行路径PAYLOAD的地址不相同
+[level6@logic level6]$ /tmp/level6/getenv PAYLOAD
+PAYLOAD is at 0xbfffdfa0
+[level6@logic level6]$ ./getenv PAYLOAD
+PAYLOAD is at 0xbfffdfb4
+环境变量地址发生变化是因为argv[0]的长度发生了变化，argv[0]也存放在栈上，它的长度会影响
+环境变量的地址，因此argv[0]的长度应该与有漏洞程序名长度一样，这样才不会出错

