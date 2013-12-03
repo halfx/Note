@@ -37,6 +37,8 @@ l1tbXUH2Q/Eotw
 level6@io:/home/level6$   
 
 
+
+
 level05_alt:
 
 level5@io:/levels$ cat level05_alt.c
@@ -60,10 +62,10 @@ int main(int argc, char* argv[], char* env[])
         newcode =  getASLRregion(64 * 1024, PROT_READ | PROT_WRITE | PROT_EXEC);
 
         if(argc > 1)
-        if(!strchr(argv[1], 0xcd))
-        if(!strchr(argv[1], 0xe8))
-        if(!strstr(argv[1], "\x0F\x34"))
-        if(!strchr(argv[1], 0xdb)) {
+        if(!strchr(argv[1], 0xcd))   // 0xcd == int
+        if(!strchr(argv[1], 0xe8))   // 0xe8 == call
+        if(!strstr(argv[1], "\x0F\x34")) // 0x340f == sysenter
+        if(!strchr(argv[1], 0xdb)) {     // 0xdb == 
                 //prepare new code section, leaving some space for a loader
                 strncpy(newcode + LOADERSIZE, argv[1], 1000);
 
@@ -86,6 +88,7 @@ void __attribute__((constructor))initializePRNG()
     if(fread(&seed, 4, 1, devrand) != 1)
     	exit(-1);
     fclose(devrand);
+    /* srand()用于给rand()提供随机种子*/
     srand(seed);
 }
 
@@ -124,4 +127,12 @@ void switchcontext(char*newstack,char*code)
 	asm("mov %0, %%esp\nmov %1,%%eax\njmp *%%eax"::"r"(newstack-4),"r"(code):"eax");
 }
 
-level5@io:/levels$ 
+level5@io:/tmp/level05$ objdump -s -j .ctors level05_alt
+
+level05_alt:     file format elf32-i386
+
+Contents of section .ctors:
+ 8049a84 ffffffff 0f870408 00000000           ............    (0f870408这里存放着initializePRNG的地址
+                                                               其地址为0804780f，此处小端机器所以是倒序)
+level5@io:/tmp/level05$ 
+

@@ -295,8 +295,8 @@ int main(int argc, char **argv, char **environ) {
         if (mark == 0)
         {
            struct user_regs_struct tmp = U;
+           /* 重点： 利用ebp来设置正确的esp*/
            tmp.esp = tmp.ebp - 20;
-
            printf("tmp.esp = %x,child will exit,write shellcode\n", tmp.esp);
            getdata(f, U.eip, bak,sc_length - 1);
            putdata(f, U.eip, shellcode, sc_length - 1);
