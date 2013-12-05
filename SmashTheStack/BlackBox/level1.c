@@ -33,7 +33,7 @@ Dump of assembler code for function main:
 0x080482fb <main+129>:  mov    %eax,(%esp)
 0x080482fe <main+132>:  call   0x80483ee <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_>
 0x08048303 <main+137>:  xor    $0x1,%al
-0x08048305 <main+139>:  test   %al,%al
+0x08048305 <main+139>:  test   %al,%al                   /* 这里有个比较跳转的过程，因此推断上面的0x80483ee函数是执行字符串比较的 */
 0x08048307 <main+141>:  jne    0x8048328 <main+174>
 0x08048309 <main+143>:  movl   $0x80ffe65,0x4(%esp)
 0x08048311 <main+151>:  lea    0xfffffff0(%ebp),%eax
@@ -100,3 +100,42 @@ Dump of assembler code for function main:
 End of assembler dump.
 
 
+(gdb) disass _ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_
+Dump of assembler code for function _ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_:
+0x080483ee <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_+0>:    push   %ebp
+0x080483ef <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_+1>:    mov    %esp,%ebp
+0x080483f1 <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_+3>:    sub    $0x8,%esp
+0x080483f4 <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_+6>:    mov    0xc(%ebp),%eax
+0x080483f7 <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_+9>:    mov    %eax,0x4(%esp)
+0x080483fb <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_+13>:   mov    0x8(%ebp),%eax
+0x080483fe <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_+16>:   mov    %eax,(%esp)
+0x08048401 <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_+19>:   call   0x8073a20 <_ZNKSs7compareEPKc>
+0x08048406 <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_+24>:   test   %eax,%eax
+0x08048408 <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_+26>:   sete   %al
+0x0804840b <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_+29>:   movzbl %al,%eax
+0x0804840e <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_+32>:   leave  
+0x0804840f <_ZSteqIcSt11char_traitsIcESaIcEEbRKSbIT_T0_T1_EPKS3_+33>:   ret    
+End of assembler dump.
+(gdb) 
+(gdb) x/8x $esp
+0xbfffd8cc:     0x0804831c      0xbfffd8f8      0x080ffe65      0xbfffd8e8
+0xbfffd8dc:     0x08048263      0x0811a1d8      0x08130ea4      0xbfffd8f8
+(gdb) 
+(gdb) x/s 0x080ffe65
+0x80ffe65 <_IO_stdin_used+33>:   "PassFor2" (正确的密码)
+(gdb) 
+(gdb) x/s 0xbfffd8f8
+0xbfffd8f8:      "糪222\023\b|\222\023\b"
+
+                                       
+(gdb) x/4x 0xbfffd8f8
+0xbfffd8f8:     0x081392bc      0x0813927c      0xbfffd920      0x00000000
+(gdb) x/s  0x081392bc
+0x81392bc:       "asdasd\b\b\b"      (正是我自己输入的密码)
+(gdb) 
+
+level1@blackbox:~$ ./login2 
+Username: level2
+Password: PassFor2
+Welcome, level 2!
+sh-3.1$ 
