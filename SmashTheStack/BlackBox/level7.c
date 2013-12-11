@@ -4,7 +4,7 @@
 Dump of assembler code for function main:
 0x08048464 <main+0>:    lea    0x4(%esp),%ecx
 0x08048468 <main+4>:    and    $0xfffffff0,%esp
-0x0804846b <main+7>:    pushl  0xfffffffc(%ecx)
+0x0804846b <main+7>:    pushl  0xfffffffc(%ecx)   /* %ecx - 0x4 */
 0x0804846e <main+10>:   push   %ebp
 0x0804846f <main+11>:   mov    %esp,%ebp
 0x08048471 <main+13>:   push   %edi
