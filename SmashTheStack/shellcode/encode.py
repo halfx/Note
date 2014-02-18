@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-<code># Shellcode encoder to avoid NUL or special characters
+# Shellcode encoder to avoid NUL or special characters
 #
 # egg = inlineegg.InlineEgg(inlineegg.Linuxx86Syscall)
 # egg.setreuid(0, 0)

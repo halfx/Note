@@ -1,6 +1,7 @@
 /*
  *
  */
+level02
 Quoting the abs() man page:
 
 Trying to take the absolute value of the most negative integer is not
@@ -14,5 +15,33 @@ WIN!
 sh-4.1$
 There we go! Level 2 is complete.
 
-$more .pass
-G2K2EP1luDpdNQ
+sh-4.2$ cd /home/level3
+sh-4.2$ more .pass
+Ib3F7i7FqjziuDOBKi
+sh-4.2$
+
+
+
+
+level02_a
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define answer 3.141593
+
+void main(int argc, char **argv) {
+
+        float a = (argc - 2)?: strtod(argv[1], 0);
+
+        printf("You provided the number %f which is too ", a);
+
+
+        if(a < answer)
+                 puts("low");
+        else if(a > answer)
+                puts("high");
+        else
+                execl("/bin/sh", "sh", "-p", NULL);
+}

