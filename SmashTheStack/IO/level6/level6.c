@@ -251,29 +251,29 @@ Dump of assembler code for function main:
    0x08048582 <+14>:    push   %ecx
    0x08048583 <+15>:    sub    $0x40,%esp
    0x08048586 <+18>:    mov    0x4(%ecx),%eax
-   0x08048589 <+21>:    mov    %eax,-0x3c(%ebp)
+   0x08048589 <+21>:    mov    %eax,-0x3c(%ebp) /* var_3c */
    0x0804858c <+24>:    mov    %gs:0x14,%eax
    0x08048592 <+30>:    mov    %eax,-0xc(%ebp)  /* var_c  = cookie */
    0x08048595 <+33>:    xor    %eax,%eax
    0x08048597 <+35>:    movl   $0x8048720,0x4(%esp)
    0x0804859f <+43>:    movl   $0x8048722,(%esp)
-   0x080485a6 <+50>:    call   0x8048460 <fopen@plt>
+   0x080485a6 <+50>:    call   0x8048460 <fopen@plt> /* fopen("/levels/level06_alt.pass", "r") */
    0x080485ab <+55>:    mov    %eax,-0x30(%ebp)   /* var_30 = File * f */
    0x080485ae <+58>:    mov    -0x30(%ebp),%eax
    0x080485b1 <+61>:    mov    %eax,0x8(%esp)
    0x080485b5 <+65>:    movl   $0x20,0x4(%esp)
-   0x080485bd <+73>:    movl   $0x80498a0,(%esp)  /* pass = 0x80498a0 */
-   0x080485c4 <+80>:    call   0x8048430 <fgets@plt>
+   0x080485bd <+73>:    movl   $0x80498a0,(%esp)  /* pass */
+   0x080485c4 <+80>:    call   0x8048430 <fgets@plt> /* fgets(pass, 32, var_30) */
    0x080485c9 <+85>:    mov    0x8049880,%eax
    0x080485ce <+90>:    mov    %eax,0x8(%esp)
    0x080485d2 <+94>:    movl   $0x3e7,0x4(%esp)
    0x080485da <+102>:   lea    -0x2c(%ebp),%eax   /* var_2c = buf[32] */
    0x080485dd <+105>:   mov    %eax,(%esp)
-   0x080485e0 <+108>:   call   0x8048430 <fgets@plt>
+   0x080485e0 <+108>:   call   0x8048430 <fgets@plt> /* fgets(var_2c, 0x3e7, stdin) */
    0x080485e5 <+113>:   movl   $0x80498a0,0x4(%esp)
    0x080485ed <+121>:   lea    -0x2c(%ebp),%eax
    0x080485f0 <+124>:   mov    %eax,(%esp)
-   0x080485f3 <+127>:   call   0x80484a0 <strcmp@plt>
+   0x080485f3 <+127>:   call   0x80484a0 <strcmp@plt> /* strcmp(buff, pass)*/
    0x080485f8 <+132>:   test   %eax,%eax
    0x080485fa <+134>:   jne    0x804863c <main+200>
    0x080485fc <+136>:   movl   $0x804873b,(%esp)
