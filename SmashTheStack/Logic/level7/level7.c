@@ -215,7 +215,6 @@ Dump of assembler code for function main:
 0x080484cd <main+137>:  lea    -0x410(%ebp),%eax
 0x080484d3 <main+143>:  mov    %eax,%edi
 0x080484d5 <main+145>:  mov    %edx,%esi
----Type <return> to continue, or q <return> to quit---
 0x080484d7 <main+147>:  cld    
 0x080484d8 <main+148>:  rep movsb %ds:(%esi),%es:(%edi) /* rep movsb 将数据从esi指定的缓冲区copy到edi指定的缓冲区*/
 0x080484da <main+150>:  lea    -0x410(%ebp),%eax        /* copy的字节数由ecx指定，也就是上面atoi的返回值*/  

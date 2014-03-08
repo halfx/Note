@@ -262,12 +262,12 @@ Dump of assembler code for function main:
    0x080485ae <+58>:    mov    -0x30(%ebp),%eax
    0x080485b1 <+61>:    mov    %eax,0x8(%esp)
    0x080485b5 <+65>:    movl   $0x20,0x4(%esp)
-   0x080485bd <+73>:    movl   $0x80498a0,(%esp)  /* pass */
+   0x080485bd <+73>:    movl   $0x80498a0,(%esp)  /* pass: 0x80498a0 */
    0x080485c4 <+80>:    call   0x8048430 <fgets@plt> /* fgets(pass, 32, var_30) */
    0x080485c9 <+85>:    mov    0x8049880,%eax
    0x080485ce <+90>:    mov    %eax,0x8(%esp)
    0x080485d2 <+94>:    movl   $0x3e7,0x4(%esp)
-   0x080485da <+102>:   lea    -0x2c(%ebp),%eax   /* var_2c = buf[32] */
+   0x080485da <+102>:   lea    -0x2c(%ebp),%eax   /* var_2c = buf[32]: 0xbffffc7c  */
    0x080485dd <+105>:   mov    %eax,(%esp)
    0x080485e0 <+108>:   call   0x8048430 <fgets@plt> /* fgets(var_2c, 0x3e7, stdin) */
    0x080485e5 <+113>:   movl   $0x80498a0,0x4(%esp)
