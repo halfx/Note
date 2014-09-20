@@ -1,3 +1,4 @@
+/* overwrite vtable pointer */
 // writen by bla for io.smashthestack.org
 #include <iostream>
 #include <cstring>

